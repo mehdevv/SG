@@ -7,12 +7,110 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="game-container">
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-screen">
+        <div class="login-content">
+            <div class="login-header">
+                <h1>Adventure Game</h1>
+                <p>Please sign in to continue</p>
+            </div>
+            <form id="loginForm" class="login-form">
+                <div class="input-group">
+                    <input type="email" id="emailInput" placeholder="Email" required>
+                </div>
+                <div class="input-group">
+                    <input type="password" id="passwordInput" placeholder="Password" required>
+                </div>
+                <button type="submit" id="loginButton" class="login-button">
+                    <span id="loginButtonText">Sign In</span>
+                    <div id="loginSpinner" class="login-spinner" style="display: none;"></div>
+                </button>
+                <div id="loginError" class="login-error" style="display: none;"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Loading Screen -->
+    <div id="loadingScreen" class="loading-screen" style="display: none;">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <h2>Loading Game...</h2>
+            <p id="loadingText">Initializing...</p>
+            <div class="loading-bar">
+                <div id="loadingProgress" class="loading-progress"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="game-container" id="gameContainer">
         <canvas id="gameCanvas" width="320" height="640"></canvas>
         <div id="joystick" class="joystick">
             <div id="joystick-knob" class="joystick-knob"></div>
         </div>
+        
+        <!-- User Stats Display -->
+        <div id="userStats" class="user-stats">
+            <div class="stats-header">
+                <h3 id="userName">Player</h3>
+                <button id="logoutButton" class="logout-button">Logout</button>
+            </div>
+            <div class="stats-content">
+                <div class="stat-item">
+                    <span class="stat-label">Level:</span>
+                    <span id="userLevel" class="stat-value">1</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Points:</span>
+                    <span id="userPoints" class="stat-value">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Experience:</span>
+                    <span id="userExp" class="stat-value">0/100</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Games Played:</span>
+                    <span id="gamesPlayed" class="stat-value">0</span>
+                </div>
+            </div>
+        </div>
     </div>
+    
+    <!-- Firebase SDK -->
+    <script type="module">
+        // Import Firebase modules
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, increment } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        
+        // Your Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyAwSj5ryXjJ8prlqoP6d0V_3jgmaK9lgP8",
+            authDomain: "rivalation-e2025.firebaseapp.com",
+            projectId: "rivalation-e2025",
+            storageBucket: "rivalation-e2025.firebasestorage.app",
+            messagingSenderId: "393944634509",
+            appId: "1:393944634509:web:18c0fde880466d2b537ec4",
+            measurementId: "G-P39N43F6DM"
+        };
+        
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        
+        // Make Firebase services available globally
+        window.auth = auth;
+        window.db = db;
+        window.signInWithEmailAndPassword = signInWithEmailAndPassword;
+        window.onAuthStateChanged = onAuthStateChanged;
+        window.getDoc = getDoc;
+        window.setDoc = setDoc;
+        window.updateDoc = updateDoc;
+        window.increment = increment;
+        window.doc = doc;
+    </script>
+    
+    <!-- Simple Game File -->
     <script src="game.js"></script>
 </body>
 </html>

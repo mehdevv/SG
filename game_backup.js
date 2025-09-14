@@ -305,8 +305,7 @@ class Camera {
         this.y = 0;
         this.targetX = 0;
         this.targetY = 0;
-        this.followSpeed = 0.25; // Faster following
-        this.zoom = 2.0; // Zoom in on player
+        this.followSpeed = 0.15;
         this.viewport = { width: 0, height: 0 };
         this.bounds = null;
     }
@@ -329,33 +328,25 @@ class Camera {
     }
     
     update() {
-        // Follow player closely
+        // Follow player
         const playerCenterX = this.game.player.x + this.game.player.width / 2;
         const playerCenterY = this.game.player.y + this.game.player.height / 2;
         
-        // Center camera on player (adjusted for zoom)
-        this.targetX = playerCenterX - (this.viewport.width / 2) / this.zoom;
-        this.targetY = playerCenterY - (this.viewport.height / 2) / this.zoom;
+        this.targetX = playerCenterX - this.viewport.width / 2;
+        this.targetY = playerCenterY - this.viewport.height / 2;
         
-        // Smooth interpolation with faster following
+        // Smooth interpolation
         this.x += (this.targetX - this.x) * this.followSpeed;
         this.y += (this.targetY - this.y) * this.followSpeed;
         
-        // Apply bounds (adjusted for zoom)
+        // Apply bounds
         if (this.bounds) {
-            const zoomedViewportWidth = this.viewport.width / this.zoom;
-            const zoomedViewportHeight = this.viewport.height / this.zoom;
-            
-            this.x = Math.max(this.bounds.x, Math.min(this.bounds.x + this.bounds.width - zoomedViewportWidth, this.x));
-            this.y = Math.max(this.bounds.y, Math.min(this.bounds.y + this.bounds.height - zoomedViewportHeight, this.y));
+            this.x = Math.max(this.bounds.x, Math.min(this.bounds.x + this.bounds.width - this.viewport.width, this.x));
+            this.y = Math.max(this.bounds.y, Math.min(this.bounds.y + this.bounds.height - this.viewport.height, this.y));
         }
     }
     
     applyTransform(ctx) {
-        // Apply zoom first
-        ctx.scale(this.zoom, this.zoom);
-        
-        // Then apply translation
         ctx.translate(-this.x, -this.y);
     }
 }
@@ -470,10 +461,10 @@ class MapManager {
 class Player {
     constructor(game) {
         this.game = game;
-        this.x = 30;
-        this.y = 550;
+        this.x = 200;
+        this.y = 200;
         this.width = 24;
-        this.height = 31.2;
+        this.height = 24;
         this.speed = 120; // pixels per second
         this.direction = 'down';
         this.isMoving = false;
@@ -486,10 +477,8 @@ class Player {
         
         // Sprite
         this.sprite = null;
-        this.spriteWidth = 0;   // Will be calculated from image width / 4
-        this.spriteHeight = 0;  // Will be calculated from image height / 4
-        this.spriteSheetCols = 4; // Number of columns in sprite sheet
-        this.spriteSheetRows = 4; // Number of rows in sprite sheet
+        this.spriteWidth = 32;
+        this.spriteHeight = 32;
         
         // Stats
         this.movementCounter = 0;
@@ -499,16 +488,7 @@ class Player {
     async loadAssets() {
         console.log('👤 Loading player assets...');
         this.sprite = await this.loadImage('assets/player sprite sheet.png');
-        
-        // Calculate sprite dimensions from actual image size
-        this.spriteWidth = this.sprite.width / this.spriteSheetCols;
-        this.spriteHeight = this.sprite.height / this.spriteSheetRows;
-        
         console.log('✅ Player assets loaded');
-        console.log(`📐 Sprite sheet: ${this.spriteSheetCols}x${this.spriteSheetRows} grid`);
-        console.log(`🖼️ Image size: ${this.sprite.width}x${this.sprite.height}px`);
-        console.log(`🎬 Frame size: ${this.spriteWidth}x${this.spriteHeight}px`);
-        console.log(`🎯 Total frames: ${this.spriteSheetCols * this.spriteSheetRows}`);
     }
     
     loadImage(src) {
@@ -592,12 +572,9 @@ class Player {
             return;
         }
         
-        // Get sprite frame coordinates
+        // Get sprite frame
         const spriteX = this.currentFrame * this.spriteWidth;
         const spriteY = this.getDirectionY() * this.spriteHeight;
-        
-        // Debug info (uncomment for troubleshooting)
-        // console.log(`Direction: ${this.direction}, Frame: ${this.currentFrame}, Sprite coords: (${spriteX}, ${spriteY})`);
         
         // Draw player sprite
         ctx.drawImage(
@@ -608,13 +585,11 @@ class Player {
     }
     
     getDirectionY() {
-        // For a 4x4 sprite sheet, each direction has 4 animation frames
-        // Row 0: Up, Row 1: Right, Row 2: Left, Row 3: Down
         switch (this.direction) {
-            case 'down': return 0;    // First row (frames 0-3)
-            case 'right': return 1; // Second row (frames 0-3)
-            case 'left': return 2;  // Third row (frames 0-3)
-            case 'up': return 3;  // Fourth row (frames 0-3)
+            case 'up': return 3;
+            case 'down': return 0;
+            case 'left': return 1;
+            case 'right': return 2;
             default: return 0;
         }
     }
