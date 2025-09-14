@@ -306,7 +306,7 @@ class Camera {
         this.targetX = 0;
         this.targetY = 0;
         this.followSpeed = 0.25; // Faster following
-        this.zoom = 1.5; // Optimized zoom for mobile
+        this.zoom = 2.0; // Zoom in on player
         this.viewport = { width: 0, height: 0 };
         this.bounds = null;
     }
@@ -417,16 +417,10 @@ class MapManager {
             this.height = data.height || 0;
             this.tileSize = data.tilewidth || 32;
             
-            // Set camera bounds (adjusted for scaled map)
+            // Set camera bounds
             const mapWidth = this.width * this.tileSize;
             const mapHeight = this.height * this.tileSize;
-            const scaleFactor = 0.8; // Same scale as render
-            const scaledWidth = mapWidth * scaleFactor;
-            const scaledHeight = mapHeight * scaleFactor;
-            const offsetX = (mapWidth - scaledWidth) / 2;
-            const offsetY = (mapHeight - scaledHeight) / 2;
-            
-            this.game.camera.setBounds(offsetX, offsetY, scaledWidth, scaledHeight);
+            this.game.camera.setBounds(0, 0, mapWidth, mapHeight);
             
             console.log(`📐 Map: ${this.width}x${this.height} tiles, ${mapWidth}x${mapHeight} pixels`);
             console.log(`🧱 Collision objects: ${this.collisionLayer.length}`);
@@ -462,20 +456,11 @@ class MapManager {
     render(ctx) {
         if (!this.worldMap) return;
         
-        // Calculate map dimensions
+        // Render world map at correct size
         const mapWidth = this.width * this.tileSize;
         const mapHeight = this.height * this.tileSize;
         
-        // Scale map to fit mobile screens better (make it smaller)
-        const scaleFactor = 0.8; // Make map 80% of original size
-        const scaledWidth = mapWidth * scaleFactor;
-        const scaledHeight = mapHeight * scaleFactor;
-        
-        // Center the map on screen
-        const offsetX = (mapWidth - scaledWidth) / 2;
-        const offsetY = (mapHeight - scaledHeight) / 2;
-        
-        ctx.drawImage(this.worldMap, offsetX, offsetY, scaledWidth, scaledHeight);
+        ctx.drawImage(this.worldMap, 0, 0, mapWidth, mapHeight);
     }
 }
 
@@ -741,6 +726,14 @@ class AuthManager {
     async init() {
         // Wait for Firebase
         await this.waitForFirebase();
+        
+        // Check if user is already logged in
+        const currentUser = window.auth.currentUser;
+        if (currentUser) {
+            console.log("✅ User already logged in:", currentUser.email);
+            this.user = currentUser;
+            this.notifyAuthStateListeners(currentUser);
+        }
         
         // Listen for auth state changes
         window.onAuthStateChanged(window.auth, (user) => {
