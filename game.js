@@ -743,147 +743,8 @@ class UIManager {
     }
     
     setupQuestPanelDrag() {
-        let isDragging = false;
-        let startX = 0;
-        let startLeft = 0;
-        let animationId = null;
-        
-        const questPanel = this.elements.questPanel;
-        const questToggle = this.elements.questToggle;
-        
-        if (!questPanel || !questToggle) return;
-        
-        // Mouse events for dragging
-        questToggle.addEventListener('mousedown', (e) => {
-            // Only start dragging if it's a long press or drag gesture
-            // For simple clicks, we'll handle it in the click event
-            const startTime = Date.now();
-            const startPos = e.clientX;
-            
-            const handleMouseMove = (moveEvent) => {
-                const deltaTime = Date.now() - startTime;
-                const deltaX = Math.abs(moveEvent.clientX - startPos);
-                
-                // If moved more than 5px or held for more than 150ms, start dragging
-                if (deltaX > 5 || deltaTime > 150) {
-                    isDragging = true;
-                    startX = moveEvent.clientX;
-                    startLeft = questPanel.classList.contains('open') ? 0 : -300;
-                    document.addEventListener('mousemove', handleDragMove);
-                    document.addEventListener('mouseup', handleMouseUp);
-                    e.preventDefault();
-                }
-            };
-            
-            const handleDragMove = (moveEvent) => {
-                if (!isDragging) return;
-                
-                const deltaX = moveEvent.clientX - startX;
-                const newLeft = Math.max(-300, Math.min(0, startLeft + deltaX));
-                
-                questPanel.style.left = newLeft + 'px';
-                
-                // Update arrow rotation based on panel position
-                if (newLeft > -150) {
-                    questToggle.classList.add('open');
-        } else {
-                    questToggle.classList.remove('open');
-                }
-            };
-            
-            const handleMouseUp = () => {
-                if (!isDragging) return;
-                isDragging = false;
-                
-                const currentLeft = parseInt(questPanel.style.left) || -300;
-                
-                // Snap to open or closed position
-                if (currentLeft > -150) {
-                    this.openQuestPanel();
-                } else {
-                    this.closeQuestPanel();
-                }
-                
-                document.removeEventListener('mousemove', handleDragMove);
-                document.removeEventListener('mouseup', handleMouseUp);
-            };
-            
-            // Add temporary move listener
-            document.addEventListener('mousemove', handleMouseMove);
-            document.addEventListener('mouseup', () => {
-                document.removeEventListener('mousemove', handleMouseMove);
-                if (!isDragging) {
-                    // It was just a click, toggle the panel
-                    this.toggleQuestPanel();
-                }
-            });
-        });
-        
-        // Touch events for mobile
-        questToggle.addEventListener('touchstart', (e) => {
-            const startTime = Date.now();
-            const startPos = e.touches[0].clientX;
-            
-            const handleTouchMove = (moveEvent) => {
-                const deltaTime = Date.now() - startTime;
-                const deltaX = Math.abs(moveEvent.touches[0].clientX - startPos);
-                
-                // If moved more than 5px or held for more than 150ms, start dragging
-                if (deltaX > 5 || deltaTime > 150) {
-                    isDragging = true;
-                    startX = moveEvent.touches[0].clientX;
-                    startLeft = questPanel.classList.contains('open') ? 0 : -300;
-                    document.addEventListener('touchmove', handleDragTouchMove);
-                    document.addEventListener('touchend', handleTouchEnd);
-                    e.preventDefault();
-                }
-            };
-            
-            const handleDragTouchMove = (moveEvent) => {
-                if (!isDragging) return;
-                
-                const deltaX = moveEvent.touches[0].clientX - startX;
-                const newLeft = Math.max(-300, Math.min(0, startLeft + deltaX));
-                
-                questPanel.style.left = newLeft + 'px';
-                
-                // Update arrow rotation based on panel position
-                if (newLeft > -150) {
-                    questToggle.classList.add('open');
-                } else {
-                    questToggle.classList.remove('open');
-                }
-                
-                moveEvent.preventDefault();
-            };
-            
-            const handleTouchEnd = () => {
-                if (!isDragging) return;
-                isDragging = false;
-                
-                const currentLeft = parseInt(questPanel.style.left) || -300;
-                
-                // Snap to open or closed position
-                if (currentLeft > -150) {
-                    this.openQuestPanel();
-                } else {
-                    this.closeQuestPanel();
-                }
-                
-                document.removeEventListener('touchmove', handleDragTouchMove);
-                document.removeEventListener('touchend', handleTouchEnd);
-            };
-            
-            // Add temporary move listener
-            document.addEventListener('touchmove', handleTouchMove);
-            document.addEventListener('touchend', () => {
-                document.removeEventListener('touchmove', handleTouchMove);
-                if (!isDragging) {
-                    // It was just a tap, toggle the panel
-                    this.toggleQuestPanel();
-                }
-            });
-        });
+        // Simple click-only functionality - no dragging
+        // The click handler is already set up in setupQuestPanel()
     }
     
     toggleQuestPanel() {
@@ -897,49 +758,11 @@ class UIManager {
     openQuestPanel() {
         this.elements.questPanel.classList.add('open');
         this.elements.questToggle.classList.add('open');
-        this.animateQuestPanel(0);
     }
     
     closeQuestPanel() {
         this.elements.questPanel.classList.remove('open');
         this.elements.questToggle.classList.remove('open');
-        this.animateQuestPanel(-300);
-    }
-    
-    animateQuestPanel(targetLeft) {
-        const questPanel = this.elements.questPanel;
-        const questToggle = this.elements.questToggle;
-        const startLeft = parseInt(questPanel.style.left) || (questPanel.classList.contains('open') ? 0 : -300);
-        const distance = targetLeft - startLeft;
-        const duration = 300; // 300ms animation
-        const startTime = performance.now();
-        
-        const animate = (currentTime) => {
-            const elapsed = currentTime - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-            
-            // Easing function for smooth animation
-            const easeOutCubic = 1 - Math.pow(1 - progress, 3);
-            const currentLeft = startLeft + (distance * easeOutCubic);
-            
-            questPanel.style.left = currentLeft + 'px';
-            
-            // Update arrow rotation based on panel position
-            if (currentLeft > -150) {
-                questToggle.classList.add('open');
-            } else {
-                questToggle.classList.remove('open');
-            }
-            
-            if (progress < 1) {
-                requestAnimationFrame(animate);
-            } else {
-                // Animation complete, ensure final position
-                questPanel.style.left = targetLeft + 'px';
-            }
-        };
-        
-        requestAnimationFrame(animate);
     }
     
     showLogin() {
