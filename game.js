@@ -28,37 +28,90 @@ class AdventureGame {
     }
     
     setupCanvas() {
-        this.canvas.width = window.innerWidth;
-        this.canvas.height = window.innerHeight;
+        // Get actual screen dimensions
+        const screenWidth = window.innerWidth;
+        const screenHeight = window.innerHeight;
+        
+        // Set canvas to full screen
+        this.canvas.width = screenWidth;
+        this.canvas.height = screenHeight;
         
         // Handle window resize
         window.addEventListener('resize', () => {
-            this.canvas.width = window.innerWidth;
-            this.canvas.height = window.innerHeight;
+            const newWidth = window.innerWidth;
+            const newHeight = window.innerHeight;
+            
+            this.canvas.width = newWidth;
+            this.canvas.height = newHeight;
             this.camera.updateViewport();
+            
+            console.log(`📱 Screen resized: ${newWidth}x${newHeight}`);
+        });
+        
+        // Handle orientation change on mobile
+        window.addEventListener('orientationchange', () => {
+            setTimeout(() => {
+                const newWidth = window.innerWidth;
+                const newHeight = window.innerHeight;
+                
+                this.canvas.width = newWidth;
+                this.canvas.height = newHeight;
+                this.camera.updateViewport();
+                
+                console.log(`🔄 Orientation changed: ${newWidth}x${newHeight}`);
+            }, 100);
         });
     }
     
     async init() {
         console.log('🎮 Initializing Adventure Game...');
         
+        // Always show loading screen first
+        this.gameState = 'loading';
+        this.ui.showLoading();
+        
         try {
-            // Initialize authentication first
+            // Initialize authentication
             await this.auth.init();
             
-            // Wait for user authentication
-            this.auth.onAuthStateChange((user) => {
-                if (user) {
-                    this.startGame();
-                } else {
-                    this.showLogin();
-                }
-            });
+            // Wait for Firebase to fully initialize and check auth state
+            await this.waitForAuthState();
             
         } catch (error) {
             console.error('❌ Game initialization failed:', error);
             this.showError('Failed to initialize game');
         }
+    }
+    
+    async waitForAuthState() {
+        return new Promise((resolve) => {
+            let attempts = 0;
+            const maxAttempts = 30; // 3 seconds max wait
+            
+            const check = () => {
+                attempts++;
+                console.log(`⏳ Checking auth state... (attempt ${attempts}/${maxAttempts})`);
+                
+                const currentUser = window.auth.currentUser;
+                console.log("🔍 Current user:", currentUser ? currentUser.email : "No user");
+                
+                if (currentUser) {
+                    console.log("✅ User already logged in:", currentUser.email);
+                    // User is logged in, start game directly
+                    this.startGame();
+                    resolve();
+                } else if (attempts >= maxAttempts) {
+                    console.log("❌ No user logged in after timeout, showing login form");
+                    // User not logged in, show login form
+                    this.showLogin();
+                    resolve();
+                } else {
+                    // Keep checking
+                    setTimeout(check, 100);
+                }
+            };
+            check();
+        });
     }
     
     async startGame() {
@@ -80,6 +133,7 @@ class AdventureGame {
             // Start game loop
             this.gameState = 'playing';
             this.ui.hideLoading();
+            this.ui.hideLogin();
             this.gameLoop();
             
             console.log('✅ Game started successfully!');
@@ -91,8 +145,14 @@ class AdventureGame {
     }
     
     showLogin() {
+        console.log("🔐 Showing login screen...");
         this.gameState = 'login';
         this.ui.showLogin();
+    }
+    
+    hideLogin() {
+        console.log("🔒 Hiding login screen...");
+        this.ui.hideLogin();
     }
     
     showError(message) {
@@ -296,7 +356,7 @@ class InputManager {
 }
 
 /**
- * Camera System - Handles viewport and following
+ * Camera System - Handles viewport and following with zoom and bounds
  */
 class Camera {
     constructor(game) {
@@ -305,7 +365,7 @@ class Camera {
         this.y = 0;
         this.targetX = 0;
         this.targetY = 0;
-        this.followSpeed = 0.25; // Faster following
+        this.followSpeed = 0.25;
         this.zoom = 2.0; // Zoom in on player
         this.viewport = { width: 0, height: 0 };
         this.bounds = null;
@@ -337,17 +397,24 @@ class Camera {
         this.targetX = playerCenterX - (this.viewport.width / 2) / this.zoom;
         this.targetY = playerCenterY - (this.viewport.height / 2) / this.zoom;
         
-        // Smooth interpolation with faster following
+        // Smooth interpolation
         this.x += (this.targetX - this.x) * this.followSpeed;
         this.y += (this.targetY - this.y) * this.followSpeed;
         
-        // Apply bounds (adjusted for zoom)
+        // Apply bounds to prevent showing areas outside the map
         if (this.bounds) {
             const zoomedViewportWidth = this.viewport.width / this.zoom;
             const zoomedViewportHeight = this.viewport.height / this.zoom;
             
-            this.x = Math.max(this.bounds.x, Math.min(this.bounds.x + this.bounds.width - zoomedViewportWidth, this.x));
-            this.y = Math.max(this.bounds.y, Math.min(this.bounds.y + this.bounds.height - zoomedViewportHeight, this.y));
+            // Calculate bounds to keep camera within map
+            const minX = this.bounds.x;
+            const maxX = this.bounds.x + this.bounds.width - zoomedViewportWidth;
+            const minY = this.bounds.y;
+            const maxY = this.bounds.y + this.bounds.height - zoomedViewportHeight;
+            
+            // Clamp camera position to stay within map bounds
+            this.x = Math.max(minX, Math.min(maxX, this.x));
+            this.y = Math.max(minY, Math.min(maxY, this.y));
         }
     }
     
@@ -609,12 +676,12 @@ class Player {
     
     getDirectionY() {
         // For a 4x4 sprite sheet, each direction has 4 animation frames
-        // Row 0: Up, Row 1: Right, Row 2: Left, Row 3: Down
+        // Row 0: Down, Row 1: Right, Row 2: Left, Row 3: Up
         switch (this.direction) {
-            case 'down': return 0;    // First row (frames 0-3)
+            case 'down': return 0;  // First row (frames 0-3)
             case 'right': return 1; // Second row (frames 0-3)
             case 'left': return 2;  // Third row (frames 0-3)
-            case 'up': return 3;  // Fourth row (frames 0-3)
+            case 'up': return 3;    // Fourth row (frames 0-3)
             default: return 0;
         }
     }
@@ -655,6 +722,10 @@ class UIManager {
         this.elements.loginScreen.style.display = 'flex';
         this.elements.loadingScreen.style.display = 'none';
         this.elements.gameContainer.style.display = 'none';
+    }
+    
+    hideLogin() {
+        this.elements.loginScreen.style.display = 'none';
     }
     
     showLoading() {
@@ -727,18 +798,30 @@ class AuthManager {
         // Wait for Firebase
         await this.waitForFirebase();
         
-        // Check if user is already logged in
-        const currentUser = window.auth.currentUser;
-        if (currentUser) {
-            console.log("✅ User already logged in:", currentUser.email);
-            this.user = currentUser;
-            this.notifyAuthStateListeners(currentUser);
-        }
-        
         // Listen for auth state changes
         window.onAuthStateChanged(window.auth, (user) => {
+            console.log("🔥 Auth state changed:", user ? user.email : "No user");
             this.user = user;
             this.notifyAuthStateListeners(user);
+            
+            // Load user stats if user is logged in
+            if (user) {
+                this.loadUserStats();
+                // Reset login loading state
+                this.setLoginLoading(false);
+                // If we're in login state and user just logged in, start the game
+                if (this.game.gameState === 'login') {
+                    console.log("🎮 User logged in, starting game...");
+                    this.game.startGame();
+                }
+            } else {
+                // User logged out, show login screen only if we're currently playing
+                if (this.game.gameState === 'playing') {
+                    console.log("👋 User logged out, showing login...");
+                    this.game.showLogin();
+                }
+                // Don't show login form during initialization - let waitForAuthState handle it
+            }
         });
         
         // Setup login form
@@ -747,9 +830,19 @@ class AuthManager {
     
     waitForFirebase() {
         return new Promise((resolve) => {
+            let attempts = 0;
+            const maxAttempts = 50; // 5 seconds max wait
+            
             const check = () => {
+                attempts++;
+                console.log(`⏳ Waiting for Firebase... (attempt ${attempts}/${maxAttempts})`);
+                
                 if (window.auth && window.onAuthStateChanged) {
+                    console.log("✅ Firebase is ready!");
                     resolve();
+                } else if (attempts >= maxAttempts) {
+                    console.error("❌ Firebase initialization timeout");
+                    resolve(); // Continue anyway
                 } else {
                     setTimeout(check, 100);
                 }
@@ -793,11 +886,15 @@ class AuthManager {
         const email = document.getElementById('emailInput').value;
         const password = document.getElementById('passwordInput').value;
         
+        console.log("🔐 Attempting login for:", email);
         this.setLoginLoading(true);
         
         try {
-            await window.signInWithEmailAndPassword(window.auth, email, password);
+            const result = await window.signInWithEmailAndPassword(window.auth, email, password);
+            console.log("✅ Login successful:", result.user.email);
+            // Don't set loading to false here - let the auth state change handle it
         } catch (error) {
+            console.error("❌ Login failed:", error);
             this.showLoginError(this.getErrorMessage(error.code));
             this.setLoginLoading(false);
         }

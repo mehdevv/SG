@@ -18,6 +18,14 @@ class AuthManager {
         // Wait for Firebase to be available
         await this.waitForFirebase();
         
+        // Check if user is already logged in
+        const currentUser = window.auth.currentUser;
+        if (currentUser) {
+            console.log("✅ User already logged in:", currentUser.email);
+            this.user = currentUser;
+            this.notifyAuthStateListeners(currentUser);
+        }
+        
         // Listen for authentication state changes
         window.onAuthStateChanged(window.auth, (user) => {
             this.user = user;
@@ -49,21 +57,20 @@ class AuthManager {
      */
     onAuthStateChange(callback) {
         this.authStateListeners.push(callback);
-        // Call immediately if user is already set
         if (this.user !== null) {
             callback(this.user);
         }
     }
 
     /**
-     * Notify all auth state listeners
+     * Notify all authentication state listeners
      */
     notifyAuthStateListeners(user) {
         this.authStateListeners.forEach(callback => {
             try {
                 callback(user);
             } catch (error) {
-                console.error('Error in auth state listener:', error);
+                console.error('Auth state listener error:', error);
             }
         });
     }
@@ -74,9 +81,11 @@ class AuthManager {
     async login(email, password) {
         try {
             const userCredential = await window.signInWithEmailAndPassword(window.auth, email, password);
-            return { success: true, user: userCredential.user };
+            console.log('✅ User logged in:', userCredential.user.email);
+            return userCredential.user;
         } catch (error) {
-            return { success: false, error: this.getErrorMessage(error.code) };
+            console.error('❌ Login failed:', error);
+            throw error;
         }
     }
 
@@ -86,14 +95,126 @@ class AuthManager {
     async logout() {
         try {
             await window.auth.signOut();
-            return { success: true };
+            console.log('✅ User logged out');
         } catch (error) {
-            return { success: false, error: error.message };
+            console.error('❌ Logout failed:', error);
+            throw error;
         }
     }
 
     /**
-     * Get user-friendly error messages
+     * Get current user
+     */
+    getCurrentUser() {
+        return this.user;
+    }
+
+    /**
+     * Check if user is authenticated
+     */
+    isAuthenticated() {
+        return this.user !== null;
+    }
+
+    /**
+     * Get user display name
+     */
+    getUserDisplayName() {
+        if (!this.user) return null;
+        return this.user.displayName || this.user.email.split('@')[0];
+    }
+
+    /**
+     * Get user email
+     */
+    getUserEmail() {
+        return this.user ? this.user.email : null;
+    }
+
+    /**
+     * Get user ID
+     */
+    getUserId() {
+        return this.user ? this.user.uid : null;
+    }
+
+    /**
+     * Setup login form event listeners
+     */
+    setupLoginForm() {
+        const loginForm = document.getElementById('loginForm');
+        if (loginForm) {
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const email = document.getElementById('emailInput').value;
+                const password = document.getElementById('passwordInput').value;
+                
+                if (!email || !password) {
+                    this.showError('Please enter both email and password');
+                    return;
+                }
+                
+                try {
+                    this.setLoading(true);
+                    await this.login(email, password);
+                } catch (error) {
+                    this.showError(this.getErrorMessage(error.code));
+                } finally {
+                    this.setLoading(false);
+                }
+            });
+        }
+        
+        // Setup logout button
+        const logoutButton = document.getElementById('logoutButton');
+        if (logoutButton) {
+            logoutButton.addEventListener('click', async () => {
+                try {
+                    await this.logout();
+                } catch (error) {
+                    console.error('Logout error:', error);
+                }
+            });
+        }
+    }
+
+    /**
+     * Set loading state for login form
+     */
+    setLoading(loading) {
+        const loginButton = document.getElementById('loginButton');
+        const loginButtonText = document.getElementById('loginButtonText');
+        const loginSpinner = document.getElementById('loginSpinner');
+        
+        if (loginButton) loginButton.disabled = loading;
+        if (loginButtonText) loginButtonText.style.display = loading ? 'none' : 'block';
+        if (loginSpinner) loginSpinner.style.display = loading ? 'block' : 'none';
+    }
+
+    /**
+     * Show error message
+     */
+    showError(message) {
+        const loginError = document.getElementById('loginError');
+        if (loginError) {
+            loginError.textContent = message;
+            loginError.style.display = 'block';
+        }
+    }
+
+    /**
+     * Hide error message
+     */
+    hideError() {
+        const loginError = document.getElementById('loginError');
+        if (loginError) {
+            loginError.style.display = 'none';
+        }
+    }
+
+    /**
+     * Get user-friendly error message
      */
     getErrorMessage(errorCode) {
         switch (errorCode) {
@@ -113,35 +234,9 @@ class AuthManager {
                 return 'Login failed. Please check your credentials.';
         }
     }
-
-    /**
-     * Get current user
-     */
-    getCurrentUser() {
-        return this.user;
-    }
-
-    /**
-     * Check if user is authenticated
-     */
-    isAuthenticated() {
-        return this.user !== null;
-    }
-
-    /**
-     * Get user ID
-     */
-    getUserId() {
-        return this.user ? this.user.uid : null;
-    }
-
-    /**
-     * Get user email
-     */
-    getUserEmail() {
-        return this.user ? this.user.email : null;
-    }
 }
 
 // Export for use in other modules
-window.AuthManager = AuthManager;
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = AuthManager;
+}
