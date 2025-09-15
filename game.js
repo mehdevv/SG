@@ -714,8 +714,141 @@ class UIManager {
             userLevel: document.getElementById('userLevel'),
             userPoints: document.getElementById('userPoints'),
             userExp: document.getElementById('userExp'),
-            gamesPlayed: document.getElementById('gamesPlayed')
+            questToggle: document.getElementById('questToggle'),
+            questPanel: document.getElementById('questPanel'),
+            questClose: document.getElementById('questClose')
         };
+        
+        // Setup quest panel functionality
+        this.setupQuestPanel();
+    }
+    
+    setupQuestPanel() {
+        // Quest toggle click handler
+        if (this.elements.questToggle) {
+            this.elements.questToggle.addEventListener('click', () => {
+                this.toggleQuestPanel();
+            });
+        }
+        
+        // Quest close button handler
+        if (this.elements.questClose) {
+            this.elements.questClose.addEventListener('click', () => {
+                this.closeQuestPanel();
+            });
+        }
+        
+        // Quest panel drag functionality
+        this.setupQuestPanelDrag();
+    }
+    
+    setupQuestPanelDrag() {
+        let isDragging = false;
+        let startX = 0;
+        let startLeft = 0;
+        
+        const questPanel = this.elements.questPanel;
+        const questToggle = this.elements.questToggle;
+        
+        if (!questPanel || !questToggle) return;
+        
+        // Mouse events
+        questToggle.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            startX = e.clientX;
+            startLeft = questPanel.classList.contains('open') ? 0 : -300;
+            e.preventDefault();
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            
+            const deltaX = e.clientX - startX;
+            const newLeft = Math.max(-300, Math.min(0, startLeft + deltaX));
+            
+            questPanel.style.left = newLeft + 'px';
+            
+            // Update arrow rotation based on panel position
+            if (newLeft > -150) {
+                questToggle.classList.add('open');
+            } else {
+                questToggle.classList.remove('open');
+            }
+        });
+        
+        document.addEventListener('mouseup', () => {
+            if (!isDragging) return;
+            isDragging = false;
+            
+            const currentLeft = parseInt(questPanel.style.left) || -300;
+            
+            // Snap to open or closed position
+            if (currentLeft > -150) {
+                this.openQuestPanel();
+            } else {
+                this.closeQuestPanel();
+            }
+        });
+        
+        // Touch events for mobile
+        questToggle.addEventListener('touchstart', (e) => {
+            isDragging = true;
+            startX = e.touches[0].clientX;
+            startLeft = questPanel.classList.contains('open') ? 0 : -300;
+            e.preventDefault();
+        });
+        
+        document.addEventListener('touchmove', (e) => {
+            if (!isDragging) return;
+            
+            const deltaX = e.touches[0].clientX - startX;
+            const newLeft = Math.max(-300, Math.min(0, startLeft + deltaX));
+            
+            questPanel.style.left = newLeft + 'px';
+            
+            // Update arrow rotation based on panel position
+            if (newLeft > -150) {
+                questToggle.classList.add('open');
+            } else {
+                questToggle.classList.remove('open');
+            }
+            
+            e.preventDefault();
+        });
+        
+        document.addEventListener('touchend', () => {
+            if (!isDragging) return;
+            isDragging = false;
+            
+            const currentLeft = parseInt(questPanel.style.left) || -300;
+            
+            // Snap to open or closed position
+            if (currentLeft > -150) {
+                this.openQuestPanel();
+            } else {
+                this.closeQuestPanel();
+            }
+        });
+    }
+    
+    toggleQuestPanel() {
+        if (this.elements.questPanel.classList.contains('open')) {
+            this.closeQuestPanel();
+        } else {
+            this.openQuestPanel();
+        }
+    }
+    
+    openQuestPanel() {
+        this.elements.questPanel.classList.add('open');
+        this.elements.questToggle.classList.add('open');
+        this.elements.questPanel.style.left = '0px';
+    }
+    
+    closeQuestPanel() {
+        this.elements.questPanel.classList.remove('open');
+        this.elements.questToggle.classList.remove('open');
+        this.elements.questPanel.style.left = '-300px';
     }
     
     showLogin() {
@@ -755,7 +888,45 @@ class UIManager {
             const expNeeded = stats.level * 100;
             this.elements.userExp.textContent = `${stats.experience}/${expNeeded}`;
         }
-        if (this.elements.gamesPlayed) this.elements.gamesPlayed.textContent = stats.gamesPlayed;
+        
+        // Update quest progress
+        this.updateQuestProgress(stats);
+    }
+    
+    updateQuestProgress(stats) {
+        const questItems = document.querySelectorAll('.quest-item');
+        if (questItems.length === 0) return;
+        
+        // Update first quest (points collection)
+        const pointsQuest = questItems[0];
+        if (pointsQuest) {
+            const progressElement = pointsQuest.querySelector('.quest-progress');
+            if (progressElement) {
+                progressElement.textContent = `Progress: ${stats.points}/100 points`;
+                
+                // Mark as completed if points >= 100
+                if (stats.points >= 100) {
+                    pointsQuest.style.borderLeftColor = '#4CAF50';
+                    pointsQuest.style.background = 'rgba(76, 175, 80, 0.1)';
+                }
+            }
+        }
+        
+        // Update second quest (level up)
+        const levelQuest = questItems[1];
+        if (levelQuest) {
+            const progressElement = levelQuest.querySelector('.quest-progress');
+            if (progressElement) {
+                const expNeeded = stats.level * 100;
+                progressElement.textContent = `Progress: ${stats.experience}/${expNeeded} XP`;
+                
+                // Mark as completed if level >= 2
+                if (stats.level >= 2) {
+                    levelQuest.style.borderLeftColor = '#4CAF50';
+                    levelQuest.style.background = 'rgba(76, 175, 80, 0.1)';
+                }
+            }
+        }
     }
     
     render(ctx) {
