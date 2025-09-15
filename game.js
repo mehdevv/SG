@@ -99,12 +99,12 @@ class AdventureGame {
                     console.log("✅ User already logged in:", currentUser.email);
                     // User is logged in, start game directly
                     this.startGame();
-                    resolve();
+                resolve();
                 } else if (attempts >= maxAttempts) {
                     console.log("❌ No user logged in after timeout, showing login form");
                     // User not logged in, show login form
                     this.showLogin();
-                    resolve();
+                resolve();
                 } else {
                     // Keep checking
                     setTimeout(check, 100);
@@ -243,7 +243,7 @@ class InputManager {
     
     handleKeyDown(e) {
         this.keys[e.key.toLowerCase()] = true;
-        e.preventDefault();
+            e.preventDefault();
     }
     
     handleKeyUp(e) {
@@ -271,7 +271,7 @@ class InputManager {
     }
     
     handleTouchStart(e) {
-        e.preventDefault();
+            e.preventDefault();
         if (e.touches.length > 0) {
             const touch = e.touches[0];
             this.touch.active = true;
@@ -282,7 +282,7 @@ class InputManager {
     }
     
     handleTouchMove(e) {
-        e.preventDefault();
+            e.preventDefault();
         if (this.touch.active && e.touches.length > 0) {
             const touch = e.touches[0];
             this.touch.x = touch.clientX;
@@ -328,12 +328,12 @@ class InputManager {
         if (this.joystick.active) {
             const deltaX = this.joystick.position.x - this.joystick.center.x;
             const deltaY = this.joystick.position.y - this.joystick.center.y;
-            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-            
+        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        
             if (distance > 10) { // Dead zone
                 const maxDist = this.joystick.maxDistance;
                 const clampedDist = Math.min(distance, maxDist);
-                const angle = Math.atan2(deltaY, deltaX);
+            const angle = Math.atan2(deltaY, deltaX);
                 
                 x = Math.cos(angle) * (clampedDist / maxDist);
                 y = Math.sin(angle) * (clampedDist / maxDist);
@@ -746,88 +746,143 @@ class UIManager {
         let isDragging = false;
         let startX = 0;
         let startLeft = 0;
+        let animationId = null;
         
         const questPanel = this.elements.questPanel;
         const questToggle = this.elements.questToggle;
         
         if (!questPanel || !questToggle) return;
         
-        // Mouse events
+        // Mouse events for dragging
         questToggle.addEventListener('mousedown', (e) => {
-            isDragging = true;
-            startX = e.clientX;
-            startLeft = questPanel.classList.contains('open') ? 0 : -300;
-            e.preventDefault();
-        });
-        
-        document.addEventListener('mousemove', (e) => {
-            if (!isDragging) return;
+            // Only start dragging if it's a long press or drag gesture
+            // For simple clicks, we'll handle it in the click event
+            const startTime = Date.now();
+            const startPos = e.clientX;
             
-            const deltaX = e.clientX - startX;
-            const newLeft = Math.max(-300, Math.min(0, startLeft + deltaX));
+            const handleMouseMove = (moveEvent) => {
+                const deltaTime = Date.now() - startTime;
+                const deltaX = Math.abs(moveEvent.clientX - startPos);
+                
+                // If moved more than 5px or held for more than 150ms, start dragging
+                if (deltaX > 5 || deltaTime > 150) {
+                    isDragging = true;
+                    startX = moveEvent.clientX;
+                    startLeft = questPanel.classList.contains('open') ? 0 : -300;
+                    document.addEventListener('mousemove', handleDragMove);
+                    document.addEventListener('mouseup', handleMouseUp);
+                    e.preventDefault();
+                }
+            };
             
-            questPanel.style.left = newLeft + 'px';
+            const handleDragMove = (moveEvent) => {
+                if (!isDragging) return;
+                
+                const deltaX = moveEvent.clientX - startX;
+                const newLeft = Math.max(-300, Math.min(0, startLeft + deltaX));
+                
+                questPanel.style.left = newLeft + 'px';
+                
+                // Update arrow rotation based on panel position
+                if (newLeft > -150) {
+                    questToggle.classList.add('open');
+        } else {
+                    questToggle.classList.remove('open');
+                }
+            };
             
-            // Update arrow rotation based on panel position
-            if (newLeft > -150) {
-                questToggle.classList.add('open');
-            } else {
-                questToggle.classList.remove('open');
-            }
-        });
-        
-        document.addEventListener('mouseup', () => {
-            if (!isDragging) return;
-            isDragging = false;
+            const handleMouseUp = () => {
+                if (!isDragging) return;
+                isDragging = false;
+                
+                const currentLeft = parseInt(questPanel.style.left) || -300;
+                
+                // Snap to open or closed position
+                if (currentLeft > -150) {
+                    this.openQuestPanel();
+                } else {
+                    this.closeQuestPanel();
+                }
+                
+                document.removeEventListener('mousemove', handleDragMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+            };
             
-            const currentLeft = parseInt(questPanel.style.left) || -300;
-            
-            // Snap to open or closed position
-            if (currentLeft > -150) {
-                this.openQuestPanel();
-            } else {
-                this.closeQuestPanel();
-            }
+            // Add temporary move listener
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', () => {
+                document.removeEventListener('mousemove', handleMouseMove);
+                if (!isDragging) {
+                    // It was just a click, toggle the panel
+                    this.toggleQuestPanel();
+                }
+            });
         });
         
         // Touch events for mobile
         questToggle.addEventListener('touchstart', (e) => {
-            isDragging = true;
-            startX = e.touches[0].clientX;
-            startLeft = questPanel.classList.contains('open') ? 0 : -300;
-            e.preventDefault();
-        });
-        
-        document.addEventListener('touchmove', (e) => {
-            if (!isDragging) return;
+            const startTime = Date.now();
+            const startPos = e.touches[0].clientX;
             
-            const deltaX = e.touches[0].clientX - startX;
-            const newLeft = Math.max(-300, Math.min(0, startLeft + deltaX));
+            const handleTouchMove = (moveEvent) => {
+                const deltaTime = Date.now() - startTime;
+                const deltaX = Math.abs(moveEvent.touches[0].clientX - startPos);
+                
+                // If moved more than 5px or held for more than 150ms, start dragging
+                if (deltaX > 5 || deltaTime > 150) {
+                    isDragging = true;
+                    startX = moveEvent.touches[0].clientX;
+                    startLeft = questPanel.classList.contains('open') ? 0 : -300;
+                    document.addEventListener('touchmove', handleDragTouchMove);
+                    document.addEventListener('touchend', handleTouchEnd);
+                    e.preventDefault();
+                }
+            };
             
-            questPanel.style.left = newLeft + 'px';
+            const handleDragTouchMove = (moveEvent) => {
+                if (!isDragging) return;
+                
+                const deltaX = moveEvent.touches[0].clientX - startX;
+                const newLeft = Math.max(-300, Math.min(0, startLeft + deltaX));
+                
+                questPanel.style.left = newLeft + 'px';
+                
+                // Update arrow rotation based on panel position
+                if (newLeft > -150) {
+                    questToggle.classList.add('open');
+                } else {
+                    questToggle.classList.remove('open');
+                }
+                
+                moveEvent.preventDefault();
+            };
             
-            // Update arrow rotation based on panel position
-            if (newLeft > -150) {
-                questToggle.classList.add('open');
-            } else {
-                questToggle.classList.remove('open');
-            }
+            const handleTouchEnd = () => {
+                if (!isDragging) return;
+                isDragging = false;
+                
+                const currentLeft = parseInt(questPanel.style.left) || -300;
+                
+                // Snap to open or closed position
+                if (currentLeft > -150) {
+                    this.openQuestPanel();
+                } else {
+                    this.closeQuestPanel();
+                }
+                
+                document.removeEventListener('touchmove', handleDragTouchMove);
+                document.removeEventListener('touchend', handleTouchEnd);
+            };
             
-            e.preventDefault();
-        });
-        
-        document.addEventListener('touchend', () => {
-            if (!isDragging) return;
-            isDragging = false;
-            
-            const currentLeft = parseInt(questPanel.style.left) || -300;
-            
-            // Snap to open or closed position
-            if (currentLeft > -150) {
-                this.openQuestPanel();
-            } else {
-                this.closeQuestPanel();
-            }
+            // Add temporary move listener
+            document.addEventListener('touchmove', handleTouchMove);
+            document.addEventListener('touchend', () => {
+                document.removeEventListener('touchmove', handleTouchMove);
+                if (!isDragging) {
+                    // It was just a tap, toggle the panel
+                    this.toggleQuestPanel();
+                }
+            });
         });
     }
     
@@ -842,13 +897,49 @@ class UIManager {
     openQuestPanel() {
         this.elements.questPanel.classList.add('open');
         this.elements.questToggle.classList.add('open');
-        this.elements.questPanel.style.left = '0px';
+        this.animateQuestPanel(0);
     }
     
     closeQuestPanel() {
         this.elements.questPanel.classList.remove('open');
         this.elements.questToggle.classList.remove('open');
-        this.elements.questPanel.style.left = '-300px';
+        this.animateQuestPanel(-300);
+    }
+    
+    animateQuestPanel(targetLeft) {
+        const questPanel = this.elements.questPanel;
+        const questToggle = this.elements.questToggle;
+        const startLeft = parseInt(questPanel.style.left) || (questPanel.classList.contains('open') ? 0 : -300);
+        const distance = targetLeft - startLeft;
+        const duration = 300; // 300ms animation
+        const startTime = performance.now();
+        
+        const animate = (currentTime) => {
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            
+            // Easing function for smooth animation
+            const easeOutCubic = 1 - Math.pow(1 - progress, 3);
+            const currentLeft = startLeft + (distance * easeOutCubic);
+            
+            questPanel.style.left = currentLeft + 'px';
+            
+            // Update arrow rotation based on panel position
+            if (currentLeft > -150) {
+                questToggle.classList.add('open');
+            } else {
+                questToggle.classList.remove('open');
+            }
+            
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                // Animation complete, ensure final position
+                questPanel.style.left = targetLeft + 'px';
+            }
+        };
+        
+        requestAnimationFrame(animate);
     }
     
     showLogin() {
