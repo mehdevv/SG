@@ -51,7 +51,10 @@
         <!-- User Stats Display -->
         <div id="userStats" class="user-stats">
             <div class="stats-header">
-                <h3 id="userName">Player</h3>
+                <div class="player-info">
+                    <img id="playerAvatar" class="player-avatar" src="" alt="Player Avatar" style="display: none;">
+                    <h3 id="userName">Player</h3>
+                </div>
                 <button id="logoutButton" class="logout-button">Logout</button>
             </div>
             <div class="stats-content">
@@ -79,19 +82,9 @@
         <div id="questPanel" class="quest-panel">
             <div class="quest-header">
                 <h3>Quests</h3>
-                <button id="questClose" class="quest-close">×</button>
             </div>
             <div class="quest-content">
-                <div class="quest-item">
-                    <div class="quest-title">Welcome to Adventure!</div>
-                    <div class="quest-description">Explore the world and collect points</div>
-                    <div class="quest-progress">Progress: 0/100 points</div>
-                </div>
-                <div class="quest-item">
-                    <div class="quest-title">Level Up</div>
-                    <div class="quest-description">Reach level 2</div>
-                    <div class="quest-progress">Progress: 0/100 XP</div>
-                </div>
+                <!-- Quests will be loaded dynamically from Firestore -->
             </div>
         </div>
     </div>
@@ -100,8 +93,8 @@
     <script type="module">
         // Import Firebase modules
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
-        import { getFirestore, doc, getDoc, setDoc, updateDoc, increment } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, createUserWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, increment, collection, query, where, getDocs, deleteDoc, deleteField } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
         
         // Your Firebase config
         const firebaseConfig = {
@@ -123,12 +116,19 @@
         window.auth = auth;
         window.db = db;
         window.signInWithEmailAndPassword = signInWithEmailAndPassword;
+        window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
         window.onAuthStateChanged = onAuthStateChanged;
         window.getDoc = getDoc;
         window.setDoc = setDoc;
         window.updateDoc = updateDoc;
         window.increment = increment;
         window.doc = doc;
+        window.collection = collection;
+        window.query = query;
+        window.where = where;
+        window.getDocs = getDocs;
+        window.deleteDoc = deleteDoc;
+        window.deleteField = deleteField;
     </script>
     
     <!-- Simple Game File -->

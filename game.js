@@ -11,6 +11,7 @@ class AdventureGame {
         this.gameState = 'loading'; // loading, playing, paused
         this.lastTime = 0;
         this.deltaTime = 0;
+        this.statsRefreshTimer = 0;
         
         // Initialize canvas
         this.setupCanvas();
@@ -134,6 +135,12 @@ class AdventureGame {
             this.gameState = 'playing';
             this.ui.hideLoading();
             this.ui.hideLogin();
+            
+            // Force refresh user stats to ensure latest data from Firestore
+            if (this.auth && this.auth.user) {
+                this.auth.refreshUserStats();
+            }
+            
             this.gameLoop();
             
             console.log('✅ Game started successfully!');
@@ -159,11 +166,21 @@ class AdventureGame {
         this.ui.showError(message);
     }
     
+    
     gameLoop(currentTime = 0) {
         if (this.gameState !== 'playing') return;
         
         this.deltaTime = currentTime - this.lastTime;
         this.lastTime = currentTime;
+        
+        // Track stats refresh timer
+        this.statsRefreshTimer += this.deltaTime;
+        
+        // Refresh user stats from Firestore every 30 seconds to stay synchronized
+        if (this.statsRefreshTimer >= 30000) {
+            this.auth.refreshUserStats();
+            this.statsRefreshTimer = 0;
+        }
         
         // Update game systems
         this.update();
@@ -558,9 +575,6 @@ class Player {
         this.spriteSheetCols = 4; // Number of columns in sprite sheet
         this.spriteSheetRows = 4; // Number of rows in sprite sheet
         
-        // Stats
-        this.movementCounter = 0;
-        this.pointsThreshold = 100;
     }
     
     async loadAssets() {
@@ -609,12 +623,6 @@ class Player {
             // Apply movement with collision detection
             this.move(moveX, moveY);
             
-            // Award points for movement
-            this.movementCounter++;
-            if (this.movementCounter >= this.pointsThreshold) {
-                this.game.auth.addPoints(1);
-                this.movementCounter = 0;
-            }
         }
         
         // Update animation
@@ -714,9 +722,9 @@ class UIManager {
             userLevel: document.getElementById('userLevel'),
             userPoints: document.getElementById('userPoints'),
             userExp: document.getElementById('userExp'),
+            playerAvatar: document.getElementById('playerAvatar'),
             questToggle: document.getElementById('questToggle'),
-            questPanel: document.getElementById('questPanel'),
-            questClose: document.getElementById('questClose')
+            questPanel: document.getElementById('questPanel')
         };
         
         // Setup quest panel functionality
@@ -731,12 +739,6 @@ class UIManager {
             });
         }
         
-        // Quest close button handler
-        if (this.elements.questClose) {
-            this.elements.questClose.addEventListener('click', () => {
-                this.closeQuestPanel();
-            });
-        }
         
         // Quest panel drag functionality
         this.setupQuestPanelDrag();
@@ -758,11 +760,13 @@ class UIManager {
     openQuestPanel() {
         this.elements.questPanel.classList.add('open');
         this.elements.questToggle.classList.add('open');
+        console.log('📋 Quest panel pulled out from left side');
     }
     
     closeQuestPanel() {
         this.elements.questPanel.classList.remove('open');
         this.elements.questToggle.classList.remove('open');
+        console.log('📋 Quest panel pushed back behind arrow');
     }
     
     showLogin() {
@@ -795,52 +799,187 @@ class UIManager {
     updateUserStats(stats) {
         if (!stats) return;
         
-        if (this.elements.userName) this.elements.userName.textContent = stats.email.split('@')[0];
-        if (this.elements.userLevel) this.elements.userLevel.textContent = stats.level;
-        if (this.elements.userPoints) this.elements.userPoints.textContent = stats.points;
-        if (this.elements.userExp) {
-            const expNeeded = stats.level * 100;
-            this.elements.userExp.textContent = `${stats.experience}/${expNeeded}`;
+        // Store previous values for comparison
+        const previousStats = this.lastStats || {};
+        
+        // Update username - always use the actual name from Firebase
+        if (this.elements.userName) {
+            const newName = stats.name || 'Player';
+            if (this.elements.userName.textContent !== newName) {
+                this.elements.userName.textContent = newName;
+                this.highlightStatChange('userName');
+            }
         }
+        
+        // Update level
+        if (this.elements.userLevel) {
+            if (this.elements.userLevel.textContent !== stats.level.toString()) {
+                this.elements.userLevel.textContent = stats.level;
+                this.highlightStatChange('userLevel');
+            }
+        }
+        
+        // Update points (DZD)
+        if (this.elements.userPoints) {
+            if (this.elements.userPoints.textContent !== stats.points.toString()) {
+                this.elements.userPoints.textContent = stats.points;
+                this.highlightStatChange('userPoints');
+            }
+        }
+        
+        // Update experience
+        if (this.elements.userExp) {
+            let newExpText;
+            if (stats.level >= 10) {
+                newExpText = 'MAX';
+            } else {
+                const expNeeded = stats.level * 100; // Level 1: 100, Level 2: 200, etc.
+                newExpText = `${stats.experience}/${expNeeded}`;
+            }
+            if (this.elements.userExp.textContent !== newExpText) {
+                this.elements.userExp.textContent = newExpText;
+                this.highlightStatChange('userExp');
+            }
+        }
+        
+        
+        // Update player avatar
+        if (this.elements.playerAvatar) {
+            if (stats.skin && stats.skin.trim() !== '') {
+                if (this.elements.playerAvatar.src !== stats.skin) {
+                    this.elements.playerAvatar.src = stats.skin;
+                    this.elements.playerAvatar.style.display = 'block';
+                    this.elements.playerAvatar.onerror = () => {
+                        this.elements.playerAvatar.style.display = 'none';
+                    };
+                    }
+                } else {
+                this.elements.playerAvatar.style.display = 'none';
+            }
+        }
+        
+        // Store current stats for next comparison
+        this.lastStats = { ...stats };
         
         // Update quest progress
         this.updateQuestProgress(stats);
     }
     
-    updateQuestProgress(stats) {
+    // Add visual feedback when stats change
+    highlightStatChange(elementId) {
+        const element = this.elements[elementId];
+        if (element) {
+            element.style.transition = 'all 0.3s ease';
+            element.style.backgroundColor = '#4CAF50';
+            element.style.color = 'white';
+            element.style.borderRadius = '4px';
+            element.style.padding = '2px 4px';
+            
+            setTimeout(() => {
+                element.style.backgroundColor = '';
+                element.style.color = '';
+                element.style.borderRadius = '';
+                element.style.padding = '';
+            }, 1000);
+        }
+    }
+    
+    updatePlayerQuests(quests) {
+        const questContent = document.querySelector('.quest-content');
+        if (!questContent) return;
+        
+        if (quests.length === 0) {
+            questContent.innerHTML = '<div class="no-quests">No active quests</div>';
+            return;
+        }
+        
+        questContent.innerHTML = quests.map(quest => {
+            const timerInfo = this.game.auth.formatQuestTimeRemaining(quest.endTime);
+            
+            return `
+                <div class="quest-item" data-quest-id="${quest.id}">
+                    <div class="quest-header">
+                        <div class="quest-logo">${quest.logo || '📍'}</div>
+                        <div class="quest-info">
+                            <div class="quest-title">${quest.name}</div>
+                            <div class="quest-timer ${timerInfo.class}" data-end-time="${quest.endTime}">
+                                ${timerInfo.text}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="quest-description">${quest.description}</div>
+                    <div class="quest-rewards">
+                        <span class="reward-badge reward-xp">+${quest.xpReward || 0} XP</span>
+                        <span class="reward-badge reward-coins">+${quest.coinsReward || 0} DZD</span>
+                    </div>
+                    ${quest.verificationLink ? `
+                        <div class="quest-verification">
+                            <button class="verification-btn" onclick="window.open('${quest.verificationLink}', '_blank')">
+                                ${quest.verificationName || 'Verify Quest'}
+                            </button>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }).join('');
+        
+        // Start quest timer updates
+        this.startQuestTimerUpdates();
+    }
+    
+    startQuestTimerUpdates() {
+        // Clear existing timer
+        if (this.questTimerInterval) {
+            clearInterval(this.questTimerInterval);
+        }
+        
+        // Update timers every second
+        this.questTimerInterval = setInterval(() => {
+            this.updateQuestTimers();
+        }, 1000);
+    }
+    
+    updateQuestTimers() {
         const questItems = document.querySelectorAll('.quest-item');
-        if (questItems.length === 0) return;
-        
-        // Update first quest (points collection)
-        const pointsQuest = questItems[0];
-        if (pointsQuest) {
-            const progressElement = pointsQuest.querySelector('.quest-progress');
-            if (progressElement) {
-                progressElement.textContent = `Progress: ${stats.points}/100 points`;
+        questItems.forEach(item => {
+            const timerElement = item.querySelector('.quest-timer');
+            if (timerElement && timerElement.dataset.endTime) {
+                const endTime = new Date(timerElement.dataset.endTime);
+                const now = new Date();
+                const timeLeft = endTime - now;
                 
-                // Mark as completed if points >= 100
-                if (stats.points >= 100) {
-                    pointsQuest.style.borderLeftColor = '#4CAF50';
-                    pointsQuest.style.background = 'rgba(76, 175, 80, 0.1)';
+                if (timeLeft <= 0) {
+                    timerElement.textContent = 'Expired';
+                    timerElement.className = 'quest-timer expired';
+                } else {
+                    const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+                    const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+                    const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+                    
+                    if (hours > 0) {
+                        timerElement.textContent = `${hours}h ${minutes}m`;
+                    } else if (minutes > 0) {
+                        timerElement.textContent = `${minutes}m ${seconds}s`;
+                    } else {
+                        timerElement.textContent = `${seconds}s`;
+                    }
+                    
+                    // Change styling based on time remaining
+                    if (timeLeft < 60000) { // Less than 1 minute
+                        timerElement.className = 'quest-timer ending';
+                    } else if (timeLeft < 3600000) { // Less than 1 hour
+                        timerElement.className = 'quest-timer ending';
+                    } else {
+                        timerElement.className = 'quest-timer active';
+                    }
                 }
             }
-        }
-        
-        // Update second quest (level up)
-        const levelQuest = questItems[1];
-        if (levelQuest) {
-            const progressElement = levelQuest.querySelector('.quest-progress');
-            if (progressElement) {
-                const expNeeded = stats.level * 100;
-                progressElement.textContent = `Progress: ${stats.experience}/${expNeeded} XP`;
-                
-                // Mark as completed if level >= 2
-                if (stats.level >= 2) {
-                    levelQuest.style.borderLeftColor = '#4CAF50';
-                    levelQuest.style.background = 'rgba(76, 175, 80, 0.1)';
-                }
-            }
-        }
+        });
+    }
+    
+    updateQuestProgress(stats) {
+        // This method is now handled by updatePlayerQuests
+        // Keeping it for backward compatibility but it's no longer used
     }
     
     render(ctx) {
@@ -911,6 +1050,9 @@ class AuthManager {
         
         // Setup login form
         this.setupLoginForm();
+        
+        // Set up real-time stat update listeners
+        this.setupRealTimeUpdates();
     }
     
     waitForFirebase() {
@@ -975,14 +1117,123 @@ class AuthManager {
         this.setLoginLoading(true);
         
         try {
+            // First, try normal Firebase Auth login
             const result = await window.signInWithEmailAndPassword(window.auth, email, password);
             console.log("✅ Login successful:", result.user.email);
             // Don't set loading to false here - let the auth state change handle it
         } catch (error) {
-            console.error("❌ Login failed:", error);
-            this.showLoginError(this.getErrorMessage(error.code));
-            this.setLoginLoading(false);
+            console.log("⚠️ Firebase Auth login failed, checking for admin-created account...");
+            console.log("🔍 Original error:", error.code, error.message);
+            
+            // If Firebase Auth fails, check if this is an admin-created account
+            try {
+                await this.handleAdminCreatedAccount(email, password);
+            } catch (adminError) {
+                console.error("❌ Admin account creation/login failed:", adminError);
+                
+                // Show more specific error message
+                let errorMessage = "Login failed. ";
+                if (adminError.message.includes("No account found")) {
+                    errorMessage += "Account not found. Please check if the account was created in the admin dashboard.";
+                } else if (adminError.message.includes("Invalid password")) {
+                    errorMessage += "Incorrect password.";
+                } else if (adminError.message.includes("Firebase Auth account")) {
+                    errorMessage += "Failed to create authentication account. Please try again.";
+                } else {
+                    errorMessage += adminError.message;
+                }
+                
+                this.showLoginError(errorMessage);
+                this.setLoginLoading(false);
+            }
         }
+    }
+    
+    async handleAdminCreatedAccount(email, password) {
+        console.log("🔍 Looking for admin-created account:", email);
+        
+        try {
+            // Validate email format first
+            if (!this.isValidEmail(email)) {
+                throw new Error('Invalid email format. Please use a valid email address.');
+            }
+            
+            // Search for user document by email in Firestore
+            const usersRef = window.collection(window.db, 'users');
+            const q = window.query(usersRef, window.where('email', '==', email));
+            const querySnapshot = await window.getDocs(q);
+            
+            console.log("📊 Query results:", querySnapshot.size, "documents found");
+            
+            if (querySnapshot.empty) {
+                console.log("❌ No documents found for email:", email);
+                throw new Error('No account found with this email. Please check if the account was created in the admin dashboard.');
+            }
+            
+            const userDoc = querySnapshot.docs[0];
+            const userData = userDoc.data();
+            
+            console.log("📋 User document data:", userData);
+            console.log("🔑 needsAuthCreation:", userData.needsAuthCreation);
+            console.log("🔐 Password match:", userData.password === password);
+            
+            if (userData.needsAuthCreation && userData.password === password) {
+                console.log("🆕 Creating Firebase Auth account for admin-created user...");
+                
+                try {
+                    // Create Firebase Auth account
+                    const userCredential = await window.createUserWithEmailAndPassword(window.auth, email, password);
+                    const newUserId = userCredential.user.uid;
+                    
+                    console.log("✅ Firebase Auth account created with UID:", newUserId);
+                    
+                    // Update the existing document with the new Firebase Auth UID and remove auth creation flags
+                    await window.updateDoc(window.doc(window.db, 'users', userDoc.id), {
+                        needsAuthCreation: false,
+                        password: window.deleteField() // Remove password from document
+                    });
+                    
+                    console.log("✅ Existing Firestore document updated with auth flags removed");
+                    
+                    // Now sign in with the new account
+                    await window.signInWithEmailAndPassword(window.auth, email, password);
+                    
+                    console.log("✅ Successfully signed in with new Firebase Auth account");
+                    
+                } catch (authError) {
+                    console.error("❌ Firebase Auth creation failed:", authError);
+                    
+                    // Provide more specific error messages
+                    if (authError.code === 'auth/invalid-email') {
+                        throw new Error('Invalid email format. Please use a valid email address (e.g., user@example.com).');
+                    } else if (authError.code === 'auth/email-already-in-use') {
+                        throw new Error('This email is already registered. Try logging in normally.');
+                    } else if (authError.code === 'auth/weak-password') {
+                        throw new Error('Password is too weak. Please use a stronger password.');
+                    } else {
+                        throw new Error(`Failed to create Firebase Auth account: ${authError.message}`);
+                    }
+                }
+                
+            } else if (userData.password === password) {
+                // Account exists but password matches - this shouldn't happen if needsAuthCreation is true
+                console.log("⚠️ Account exists but needsAuthCreation is false");
+                throw new Error('Account already has Firebase Auth. Try logging in normally.');
+            } else {
+                console.log("❌ Password mismatch");
+                throw new Error('Invalid password');
+            }
+            
+        } catch (error) {
+            console.error("❌ handleAdminCreatedAccount error:", error);
+            throw error;
+        }
+    }
+    
+    // Email validation helper method
+    isValidEmail(email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
     }
     
     async handleLogout() {
@@ -1028,28 +1279,132 @@ class AuthManager {
         if (!this.user || !window.db) return;
         
         try {
-            const userDocRef = window.doc(window.db, 'users', this.user.uid);
-            const userDoc = await window.getDoc(userDocRef);
+            // First try to find by Firebase Auth UID
+            let userDocRef = window.doc(window.db, 'users', this.user.uid);
+            let userDoc = await window.getDoc(userDocRef);
             
-            if (userDoc.exists()) {
+            if (!userDoc.exists()) {
+                // If not found by UID, search by email (for admin-created accounts)
+                console.log("🔍 User document not found by UID, searching by email...");
+                const usersRef = window.collection(window.db, 'users');
+                const q = window.query(usersRef, window.where('email', '==', this.user.email));
+                const querySnapshot = await window.getDocs(q);
+                
+                if (!querySnapshot.empty) {
+                    userDoc = querySnapshot.docs[0];
+                    console.log("✅ User document found by email:", userDoc.id);
+                }
+            }
+            
+            if (userDoc && userDoc.exists()) {
                 this.userStats = userDoc.data();
+                console.log("✅ User stats loaded:", this.userStats);
+                
+                // Update last login timestamp
+                await this.updateLastLogin();
             } else {
+                // User document doesn't exist - this shouldn't happen if created via admin dashboard
+                console.warn("⚠️ User document not found for:", this.user.email);
                 this.userStats = {
                     email: this.user.email,
+                    name: 'Player', // Default name
                     level: 1,
                     points: 0,
                     experience: 0,
-                    gamesPlayed: 0,
-                    totalPlayTime: 0,
-                    lastLogin: new Date().toISOString(),
-                    createdAt: new Date().toISOString()
+                    createdAt: new Date().toISOString(),
+                    lastLogin: new Date().toISOString()
                 };
                 await this.saveUserStats();
+                console.log("✅ Created default user stats");
             }
             
             this.game.ui.updateUserStats(this.userStats);
+            
+            // Load player's quests after loading user stats
+            await this.loadPlayerQuests();
         } catch (error) {
-            console.error('Error loading user stats:', error);
+            console.error('❌ Error loading user stats:', error);
+        }
+    }
+    
+    async loadPlayerQuests() {
+        if (!this.user || !window.db) return;
+        
+        try {
+            console.log("📋 Loading player quests...");
+            
+            // Get all active quests
+            const questsRef = window.collection(window.db, 'quests');
+            const q = window.query(questsRef, window.where('status', '==', 'active'));
+            const querySnapshot = await window.getDocs(q);
+            
+            const allQuests = [];
+            querySnapshot.forEach((doc) => {
+                allQuests.push({
+                    id: doc.id,
+                    ...doc.data()
+                });
+            });
+            
+            // Filter quests assigned to this player or to all players
+            const playerQuests = [];
+            
+            for (const quest of allQuests) {
+                let shouldInclude = false;
+                
+                if (!quest.assignedPlayer || quest.assignedPlayer.trim() === '') {
+                    // Quest is assigned to all players
+                    shouldInclude = true;
+                } else {
+                    // Quest is assigned to a specific player
+                    // Try multiple matching methods
+                    
+                    // 1. Direct match with Firebase Auth UID
+                    if (quest.assignedPlayer === this.user.uid) {
+                        shouldInclude = true;
+                    }
+                    
+                    // 2. Direct match with email
+                    if (quest.assignedPlayer === this.user.email) {
+                        shouldInclude = true;
+                    }
+                    
+                    // 3. Check if assignedPlayer is a Firestore document ID that belongs to us
+                    if (!shouldInclude) {
+                        try {
+                            const userDocRef = window.doc(window.db, 'users', quest.assignedPlayer);
+                            const userDoc = await window.getDoc(userDocRef);
+                            
+                            if (userDoc.exists()) {
+                                const userData = userDoc.data();
+                                // Check if this document belongs to the current user
+                                if (userData.email === this.user.email || userData.uid === this.user.uid) {
+                                    shouldInclude = true;
+                                }
+                            }
+                        } catch (error) {
+                            console.log('Could not check user document for quest assignment:', error);
+                        }
+                    }
+                }
+                
+                if (shouldInclude) {
+                    playerQuests.push(quest);
+                }
+            }
+            
+            console.log(`📋 Found ${playerQuests.length} quests for player`);
+            console.log('📋 Quest details:', playerQuests.map(q => ({ 
+                name: q.name, 
+                assignedPlayer: q.assignedPlayer,
+                status: q.status 
+            })));
+            
+            // Update UI with player's quests
+            this.game.ui.updatePlayerQuests(playerQuests);
+            
+        } catch (error) {
+            console.error('❌ Error loading player quests:', error);
         }
     }
     
@@ -1057,43 +1412,291 @@ class AuthManager {
         if (!this.user || !this.userStats || !window.db) return;
         
         try {
-            const userDocRef = window.doc(window.db, 'users', this.user.uid);
+            // First try to save using Firebase Auth UID
+            let userDocRef = window.doc(window.db, 'users', this.user.uid);
+            let userDoc = await window.getDoc(userDocRef);
+            
+            if (!userDoc.exists()) {
+                // If document doesn't exist with UID, find by email
+                console.log("🔍 Document not found by UID, searching by email for save...");
+                const usersRef = window.collection(window.db, 'users');
+                const q = window.query(usersRef, window.where('email', '==', this.user.email));
+                const querySnapshot = await window.getDocs(q);
+                
+                if (!querySnapshot.empty) {
+                    const existingDoc = querySnapshot.docs[0];
+                    userDocRef = window.doc(window.db, 'users', existingDoc.id);
+                    console.log("✅ Found existing document for save:", existingDoc.id);
+                }
+            }
+            
             await window.setDoc(userDocRef, this.userStats);
+            console.log("💾 User stats saved to database:", this.userStats);
         } catch (error) {
-            console.error('Error saving user stats:', error);
+            console.error('❌ Error saving user stats:', error);
         }
     }
     
-    async addPoints(points) {
+    // Method to update specific stats and save to database
+    async updateStats(updates) {
         if (!this.userStats) return;
         
-        this.userStats.points += points;
-        this.userStats.experience += points;
+        // Update the stats
+        Object.assign(this.userStats, updates);
         
-        // Check for level up
-        const expNeeded = this.userStats.level * 100;
-        if (this.userStats.experience >= expNeeded) {
-            this.userStats.level++;
-            this.userStats.experience -= expNeeded;
-            console.log(`🎉 Level up! New level: ${this.userStats.level}`);
-        }
-        
+        // Update UI immediately
         this.game.ui.updateUserStats(this.userStats);
+        
+        // Save to database
         await this.saveUserStats();
+        
+        console.log("📊 Stats updated:", updates);
     }
     
-    async incrementGamesPlayed() {
-        if (!this.userStats) return;
+    // Method to update last login timestamp
+    async updateLastLogin() {
+        if (!this.user || !this.userStats || !window.db) return;
         
-        this.userStats.gamesPlayed++;
-        this.userStats.lastLogin = new Date().toISOString();
+        try {
+            // Update last login timestamp
+            this.userStats.lastLogin = new Date().toISOString();
+            
+            // Save to database
+            await this.saveUserStats();
+            
+            console.log("🕒 Last login updated:", this.userStats.lastLogin);
+        } catch (error) {
+            console.error('❌ Error updating last login:', error);
+        }
+    }
+    
+    
+    
+    // Method to refresh user stats from Firestore
+    async refreshUserStats() {
+        if (!this.user || !window.db) return;
         
+        try {
+            const userDocRef = window.doc(window.db, 'users', this.user.uid);
+            const userDoc = await window.getDoc(userDocRef);
+            
+            if (userDoc.exists()) {
+                const freshStats = userDoc.data();
+                this.userStats = freshStats;
+                this.game.ui.updateUserStats(this.userStats);
+                console.log("🔄 User stats refreshed from Firestore");
+            }
+            
+            // Also refresh quests
+            await this.loadPlayerQuests();
+        } catch (error) {
+            console.error('❌ Error refreshing user stats:', error);
+        }
+    }
+    
+    // Format quest time remaining
+    formatQuestTimeRemaining(endTime) {
+        const end = new Date(endTime);
+        const now = new Date();
+        const timeLeft = end - now;
+        
+        if (timeLeft <= 0) {
+            return { text: 'Expired', class: 'expired' };
+        }
+        
+        const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+        const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+        
+        let text;
+        if (hours > 0) {
+            text = `${hours}h ${minutes}m`;
+        } else if (minutes > 0) {
+            text = `${minutes}m ${seconds}s`;
+        } else {
+            text = `${seconds}s`;
+        }
+        
+        let className = 'active';
+        if (timeLeft < 60000) { // Less than 1 minute
+            className = 'ending';
+        } else if (timeLeft < 3600000) { // Less than 1 hour
+            className = 'ending';
+        }
+        
+        return { text, class: className };
+    }
+    
+    
+    // Method to handle external stat updates (from admin dashboard)
+    handleExternalStatUpdate(updatedStats) {
+        console.log("🔄 External stat update received:", updatedStats);
+        
+        // Update local stats
+        this.userStats = { ...this.userStats, ...updatedStats };
+        
+        // Update UI immediately
         this.game.ui.updateUserStats(this.userStats);
-        await this.saveUserStats();
+        
+        // Show notification of external update
+        this.showStatUpdateNotification();
+    }
+    
+    setupRealTimeUpdates() {
+        console.log('🔄 Setting up real-time stat updates...');
+        
+        // Listen for custom events from admin dashboard
+        window.addEventListener('playerStatsUpdated', (event) => {
+            const { playerId, stats } = event.detail;
+            console.log('📡 Received real-time stat update:', { playerId, stats });
+            
+            // Check if this update is for the current user
+            if (this.user && (this.user.uid === playerId || this.user.email === playerId)) {
+                this.handleExternalStatUpdate(stats);
+            }
+        });
+        
+        // Check localStorage for stat updates (fallback method)
+        const checkForStatUpdates = () => {
+            try {
+                const statUpdateData = localStorage.getItem('playerStatUpdate');
+                if (statUpdateData) {
+                    const statUpdate = JSON.parse(statUpdateData);
+                    const { playerId, stats, timestamp } = statUpdate;
+                    
+                    // Check if this update is recent (within last 30 seconds) and for current user
+                    const isRecent = (Date.now() - timestamp) < 30000;
+                    const isForCurrentUser = this.user && (this.user.uid === playerId || this.user.email === playerId);
+                    
+                    if (isRecent && isForCurrentUser) {
+                        console.log('📡 Received localStorage stat update:', { playerId, stats });
+                        this.handleExternalStatUpdate(stats);
+                        
+                        // Clear the update to prevent duplicate processing
+                        localStorage.removeItem('playerStatUpdate');
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking localStorage for stat updates:', error);
+            }
+        };
+        
+        // Check for updates every 2 seconds
+        setInterval(checkForStatUpdates, 2000);
+        
+        // Also check immediately
+        checkForStatUpdates();
+        
+        console.log('✅ Real-time stat updates configured');
+    }
+    
+    // Show notification when stats are updated externally
+    showStatUpdateNotification() {
+        // Create a temporary notification
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 10000;
+            font-family: 'Arial', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            max-width: 300px;
+            animation: slideInRight 0.3s ease-out;
+        `;
+        
+        notification.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 18px;">📊</span>
+                <div>
+                    <div style="font-weight: 700; margin-bottom: 2px;">Stats Updated!</div>
+                    <div style="font-size: 12px; opacity: 0.9;">Your progress has been updated</div>
+                </div>
+            </div>
+        `;
+        
+        // Add CSS animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideInRight {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOutRight {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+        
+        document.body.appendChild(notification);
+        
+        // Auto-remove after 4 seconds
+        setTimeout(() => {
+            notification.style.animation = 'slideOutRight 0.3s ease-in';
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+                if (style.parentNode) {
+                    style.parentNode.removeChild(style);
+                }
+            }, 300);
+        }, 4000);
+    }
+    
+    // Debug method to check what's in Firestore (call from browser console)
+    async debugFirestoreUsers() {
+        console.log("🔍 Debugging Firestore users collection...");
+        
+        try {
+            const usersRef = window.collection(window.db, 'users');
+            const querySnapshot = await window.getDocs(usersRef);
+            
+            console.log("📊 Total users in Firestore:", querySnapshot.size);
+            
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                console.log(`👤 User ID: ${doc.id}`);
+                console.log(`   Email: ${data.email}`);
+                console.log(`   Name: ${data.name}`);
+                console.log(`   needsAuthCreation: ${data.needsAuthCreation}`);
+                console.log(`   Has Password: ${!!data.password}`);
+                console.log(`   Created: ${data.createdAt}`);
+                console.log("---");
+            });
+            
+        } catch (error) {
+            console.error("❌ Debug error:", error);
+        }
     }
 }
 
 // Initialize game when page loads
 document.addEventListener('DOMContentLoaded', () => {
     window.game = new AdventureGame();
+    
+    // Make debug method available globally
+    window.debugFirestoreUsers = () => {
+        if (window.game && window.game.auth) {
+            return window.game.auth.debugFirestoreUsers();
+        } else {
+            console.log("❌ Game not initialized yet");
+        }
+    };
+    
+    // Make updateStats method available globally for manual stat updates
+    window.updatePlayerStats = (updates) => {
+        if (window.game && window.game.auth) {
+            return window.game.auth.updateStats(updates);
+        } else {
+            console.log("❌ Game not initialized yet");
+        }
+    };
 });
