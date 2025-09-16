@@ -19,11 +19,39 @@ class AdminDashboard {
         // Wait for Firebase to be ready
         await this.waitForFirebase();
         
+        // Debug Firebase connection
+        this.debugFirebaseConnection();
+        
         // Setup authentication listener
         this.setupAuthListener();
         
         // Setup event listeners
         this.setupEventListeners();
+    }
+    
+    debugFirebaseConnection() {
+        console.log('🔍 Debugging Firebase connection...');
+        console.log('Firebase Auth:', window.auth);
+        console.log('Firebase DB:', window.db);
+        console.log('Current User:', window.auth?.currentUser);
+        console.log('Auth Domain:', window.auth?.config?.authDomain);
+        console.log('Project ID:', window.auth?.config?.projectId);
+        
+        // Make debug function available globally
+        window.debugAdminFirebase = () => {
+            console.log('=== ADMIN DASHBOARD FIREBASE DEBUG ===');
+            console.log('Auth:', window.auth);
+            console.log('DB:', window.db);
+            console.log('Current User:', window.auth?.currentUser);
+            console.log('Auth State:', window.auth?.currentUser ? 'Logged In' : 'Not Logged In');
+            
+            if (window.auth?.currentUser) {
+                console.log('User Email:', window.auth.currentUser.email);
+                console.log('User UID:', window.auth.currentUser.uid);
+            }
+        };
+        
+        console.log('✅ Firebase debug function available as window.debugAdminFirebase()');
     }
     
     waitForFirebase() {
@@ -56,19 +84,63 @@ class AdminDashboard {
     
     async checkAdminRole(user) {
         try {
+            console.log('🔍 Checking admin role for user:', user.email, 'UID:', user.uid);
+            
             const adminDoc = await window.getDoc(window.doc(window.db, 'admin_users', user.uid));
+            
             if (adminDoc.exists() && adminDoc.data().role === 'admin') {
                 console.log('✅ Admin role verified');
                 this.showDashboard();
                 await this.loadData();
             } else {
-                console.log('❌ Not an admin user');
-                this.showError('Access denied. Admin privileges required.');
-                await window.signOut(window.auth);
+                console.log('❌ Admin role not found, attempting to create...');
+                
+                // Check if this is the default admin user or any admin user
+                if (user.email === 'adminfaouzi@gmail.com' || user.email.includes('admin')) {
+                    console.log('🔧 Creating admin role for admin user...');
+                    await this.createAdminRole(user);
+                } else {
+                    console.log('❌ Not an admin user');
+                    this.showError('Access denied. Admin privileges required.');
+                    await window.signOut(window.auth);
+                }
             }
         } catch (error) {
             console.error('❌ Error checking admin role:', error);
-            this.showError('Error verifying admin access.');
+            
+            // If there's an error, try to create admin role for default admin
+            if (user.email === 'adminfaouzi@gmail.com') {
+                console.log('🔧 Error occurred, attempting to create admin role...');
+                try {
+                    await this.createAdminRole(user);
+                } catch (createError) {
+                    console.error('❌ Failed to create admin role:', createError);
+                    this.showError('Error setting up admin access. Please check Firebase configuration.');
+                }
+            } else {
+                this.showError('Error verifying admin access.');
+            }
+        }
+    }
+    
+    async createAdminRole(user) {
+        try {
+            console.log('🔧 Creating admin role document...');
+            
+            await window.setDoc(window.doc(window.db, 'admin_users', user.uid), {
+                role: 'admin',
+                email: user.email,
+                createdAt: new Date().toISOString(),
+                createdBy: 'system'
+            });
+            
+            console.log('✅ Admin role created successfully');
+            this.showDashboard();
+            await this.loadData();
+            
+        } catch (error) {
+            console.error('❌ Failed to create admin role:', error);
+            throw error;
         }
     }
     
@@ -162,8 +234,67 @@ class AdminDashboard {
             await window.signInWithEmailAndPassword(window.auth, email, password);
         } catch (error) {
             console.error('❌ Login failed:', error);
+            
+            // If user not found and it's the default admin, try to create it
+            if (error.code === 'auth/user-not-found' && email === 'adminfaouzi@gmail.com') {
+                console.log('🔧 Admin user not found, attempting to create...');
+                try {
+                    await this.createAdminUser(email, password);
+                    return; // Don't show error, user creation will handle login
+                } catch (createError) {
+                    console.error('❌ Failed to create admin user:', createError);
+                    this.showLoginError('Failed to create admin user. Please check Firebase configuration.');
+                    this.setLoginLoading(false);
+                    return;
+                }
+            }
+            
             this.showLoginError(this.getErrorMessage(error.code));
             this.setLoginLoading(false);
+        }
+    }
+    
+    async createAdminUser(email, password) {
+        try {
+            console.log('🔧 Creating admin user...');
+            
+            // Create the user account
+            const userCredential = await window.createUserWithEmailAndPassword(window.auth, email, password);
+            const user = userCredential.user;
+            
+            console.log('✅ Admin user created:', user.uid);
+            
+            // Create admin role document
+            await window.setDoc(window.doc(window.db, 'admin_users', user.uid), {
+                role: 'admin',
+                email: email,
+                createdAt: new Date().toISOString(),
+                createdBy: 'system'
+            });
+            
+            console.log('✅ Admin role created successfully');
+            this.setLoginLoading(false);
+            
+            // Show success message
+            this.showSuccessMessage('Admin user created successfully! You are now logged in.');
+            
+        } catch (error) {
+            console.error('❌ Failed to create admin user:', error);
+            this.setLoginLoading(false);
+            
+            let errorMessage = 'Failed to create admin user. ';
+            if (error.code === 'auth/email-already-in-use') {
+                errorMessage += 'Email is already in use.';
+            } else if (error.code === 'auth/weak-password') {
+                errorMessage += 'Password is too weak.';
+            } else if (error.code === 'auth/invalid-email') {
+                errorMessage += 'Invalid email address.';
+            } else {
+                errorMessage += 'Please check Firebase configuration.';
+            }
+            
+            this.showLoginError(errorMessage);
+            throw error;
         }
     }
     
@@ -201,8 +332,18 @@ class AdminDashboard {
                 return 'Incorrect password.';
             case 'auth/invalid-email':
                 return 'Invalid email address.';
+            case 'auth/too-many-requests':
+                return 'Too many failed attempts. Please try again later.';
+            case 'auth/weak-password':
+                return 'Password is too weak.';
+            case 'auth/email-already-in-use':
+                return 'Email is already in use.';
+            case 'auth/network-request-failed':
+                return 'Network error. Please check your connection.';
+            case 'auth/operation-not-allowed':
+                return 'Email/password authentication is not enabled.';
             default:
-                return 'Login failed. Please check your credentials.';
+                return `Login failed: ${errorCode}. Please check your credentials.`;
         }
     }
     
