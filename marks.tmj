@@ -1,0 +1,234 @@
+{ "compressionlevel":-1,
+ "height":40,
+ "infinite":false,
+ "layers":[
+        {
+         "data":[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 153, 0, 0, 0, 153, 0, 0, 0, 153, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 153, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+         "height":40,
+         "id":13,
+         "name":"Tile Layer 11",
+         "opacity":1,
+         "type":"tilelayer",
+         "visible":true,
+         "width":20,
+         "x":0,
+         "y":0
+        }],
+ "nextlayerid":14,
+ "nextobjectid":49,
+ "orientation":"orthogonal",
+ "renderorder":"right-down",
+ "tiledversion":"1.11.2",
+ "tileheight":16,
+ "tilesets":[
+        {
+         "firstgid":1,
+         "source":"..\/tile_0001.tsx"
+        }, 
+        {
+         "firstgid":1,
+         "source":"..\/tile_0131.tsx"
+        }, 
+        {
+         "firstgid":1,
+         "source":"..\/tile_0000.tsx"
+        }, 
+        {
+         "firstgid":2,
+         "source":"..\/tile_0002.tsx"
+        }, 
+        {
+         "firstgid":2,
+         "source":"..\/tile_0003.tsx"
+        }, 
+        {
+         "firstgid":2,
+         "source":"..\/tile_0004.tsx"
+        }, 
+        {
+         "columns":12,
+         "firstgid":2,
+         "image":"assets\/Tilemap\/tilemap_packed.png",
+         "imageheight":176,
+         "imagewidth":192,
+         "margin":0,
+         "name":"tilemap_packed",
+         "spacing":0,
+         "tilecount":132,
+         "tileheight":16,
+         "tilewidth":16
+        }, 
+        {
+         "columns":2,
+         "firstgid":134,
+         "image":"home.png",
+         "imageheight":40,
+         "imagewidth":40,
+         "margin":0,
+         "name":"home",
+         "spacing":0,
+         "tilecount":4,
+         "tileheight":16,
+         "tilewidth":16
+        }, 
+        {
+         "columns":2,
+         "firstgid":138,
+         "image":"home.png",
+         "imageheight":40,
+         "imagewidth":40,
+         "margin":0,
+         "name":"home",
+         "spacing":0,
+         "tilecount":4,
+         "tileheight":20,
+         "tilewidth":20
+        }, 
+        {
+         "columns":1,
+         "firstgid":142,
+         "image":"..\/Untitled design (6).png",
+         "imageheight":875,
+         "imagewidth":438,
+         "margin":0,
+         "name":"mark",
+         "spacing":0,
+         "tilecount":1,
+         "tileheight":438,
+         "tilewidth":438
+        }, 
+        {
+         "columns":1,
+         "firstgid":143,
+         "image":"..\/Untitled design (6).png",
+         "imageheight":875,
+         "imagewidth":438,
+         "margin":0,
+         "name":"mark1",
+         "spacing":0,
+         "tilecount":1,
+         "tileheight":875,
+         "tilewidth":438
+        }, 
+        {
+         "columns":1,
+         "firstgid":144,
+         "image":"..\/Untitled design (9).png",
+         "imageheight":40,
+         "imagewidth":20,
+         "margin":0,
+         "name":"40mark",
+         "spacing":0,
+         "tilecount":2,
+         "tileheight":16,
+         "tilewidth":16
+        }, 
+        {
+         "columns":1,
+         "firstgid":146,
+         "image":"..\/Untitled design (9).png",
+         "imageheight":40,
+         "imagewidth":20,
+         "margin":0,
+         "name":"mark400",
+         "spacing":0,
+         "tilecount":2,
+         "tileheight":20,
+         "tilewidth":20
+        }, 
+        {
+         "columns":1,
+         "firstgid":148,
+         "image":"..\/Untitled design (9).png",
+         "imageheight":40,
+         "imagewidth":40,
+         "margin":0,
+         "name":"markanim",
+         "spacing":0,
+         "tilecount":1,
+         "tileheight":40,
+         "tilewidth":40
+        }, 
+        {
+         "columns":2,
+         "firstgid":149,
+         "image":"..\/Untitled design (9).png",
+         "imageheight":40,
+         "imagewidth":40,
+         "margin":0,
+         "name":"Untitled design (9)",
+         "spacing":0,
+         "tilecount":4,
+         "tileheight":20,
+         "tilewidth":20
+        }, 
+        {
+         "columns":2,
+         "firstgid":153,
+         "image":"..\/Untitled design (9).png",
+         "imageheight":40,
+         "imagewidth":40,
+         "margin":0,
+         "name":"Untitled design (9)",
+         "spacing":0,
+         "tilecount":2,
+         "tileheight":40,
+         "tiles":[
+                {
+                 "animation":[
+                        {
+                         "duration":300,
+                         "tileid":0
+                        }, 
+                        {
+                         "duration":300,
+                         "tileid":1
+                        }],
+                 "id":0
+                }],
+         "tilewidth":20
+        }],
+ "tilewidth":16,
+ "type":"map",
+ "version":"1.10",
+ "width":20
+}

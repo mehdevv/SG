@@ -67,6 +67,9 @@ class AdventureGame {
     async init() {
         console.log('🎮 Initializing Adventure Game...');
         
+        // Check if user is on PC and show QR code message
+        this.checkDeviceAndShowQR();
+        
         // Always show loading screen first
         this.gameState = 'loading';
         this.ui.showLoading();
@@ -81,6 +84,24 @@ class AdventureGame {
         } catch (error) {
             console.error('❌ Game initialization failed:', error);
             this.showError('Failed to initialize game');
+        }
+    }
+    
+    checkDeviceAndShowQR() {
+        // Check if user is on a desktop/PC device
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+        const isSmallScreen = window.innerWidth <= 768;
+        
+        // If it's not mobile, not touch device, and not small screen, show QR code
+        if (!isMobile && !isTouchDevice && !isSmallScreen) {
+            console.log('🖥️ PC detected - showing QR code message');
+            const pcMessage = document.getElementById('pcMessage');
+            if (pcMessage) {
+                pcMessage.style.display = 'flex';
+            }
+        } else {
+            console.log('📱 Mobile device detected - hiding QR code message');
         }
     }
     
