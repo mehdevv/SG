@@ -230,6 +230,124 @@ class UIManager {
             this.loginError.textContent = message;
             this.loginError.style.display = 'block';
         }
+        // Also show as bottom notification for better visibility
+        this.showBottomNotification(message, 'error', 4000);
+    }
+    
+    /**
+     * Show notification at the bottom of the screen
+     * @param {string} message - The notification message
+     * @param {string} type - The notification type (success, error, info, warning)
+     * @param {number} duration - How long to show the notification (default: 3000ms)
+     */
+    showBottomNotification(message, type = 'info', duration = 3000) {
+        // Remove any existing notifications to prevent stacking
+        const existingNotifications = document.querySelectorAll('.bottom-notification');
+        existingNotifications.forEach(notification => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        });
+        
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.className = 'bottom-notification';
+        
+        // Set colors based on type
+        let backgroundColor, textColor, icon;
+        switch (type) {
+            case 'success':
+                backgroundColor = 'rgba(52, 199, 89, 0.9)';
+                textColor = 'white';
+                icon = '✅';
+                break;
+            case 'error':
+                backgroundColor = 'rgba(255, 59, 48, 0.9)';
+                textColor = 'white';
+                icon = '❌';
+                break;
+            case 'warning':
+                backgroundColor = 'rgba(255, 149, 0, 0.9)';
+                textColor = 'white';
+                icon = '⚠️';
+                break;
+            case 'info':
+            default:
+                backgroundColor = 'rgba(0, 122, 255, 0.9)';
+                textColor = 'white';
+                icon = 'ℹ️';
+                break;
+        }
+        
+        // Apply styles
+        notification.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: ${backgroundColor};
+            color: ${textColor};
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            z-index: 10000;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            max-width: 90vw;
+            text-align: center;
+            animation: slideUpIn 0.3s ease-out;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        `;
+        
+        // Set content
+        notification.innerHTML = `${icon} ${message}`;
+        
+        // Add to page
+        document.body.appendChild(notification);
+        
+        // Add CSS animation if not already added
+        if (!document.getElementById('bottom-notification-styles')) {
+            const style = document.createElement('style');
+            style.id = 'bottom-notification-styles';
+            style.textContent = `
+                @keyframes slideUpIn {
+                    from {
+                        opacity: 0;
+                        transform: translateX(-50%) translateY(20px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateX(-50%) translateY(0);
+                    }
+                }
+                @keyframes slideDownOut {
+                    from {
+                        opacity: 1;
+                        transform: translateX(-50%) translateY(0);
+                    }
+                    to {
+                        opacity: 0;
+                        transform: translateX(-50%) translateY(20px);
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        // Remove after duration
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.style.animation = 'slideDownOut 0.3s ease-in';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }
+        }, duration);
     }
 
     /**

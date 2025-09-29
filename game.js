@@ -23,6 +23,7 @@ class AdventureGame {
         this.player = new Player(this);
         this.ui = new UIManager(this);
         this.auth = new AuthManager(this);
+        this.feedback = new FeedbackManager(this);
         
         // Start the game
         this.init();
@@ -77,6 +78,9 @@ class AdventureGame {
         try {
             // Initialize authentication
             await this.auth.init();
+            
+            // Setup auth state listener
+            this.setupAuthStateListener();
             
             // Wait for Firebase to fully initialize and check auth state
             await this.waitForAuthState();
@@ -134,6 +138,27 @@ class AdventureGame {
             };
             check();
         });
+    }
+    
+    // Setup auth state listener to handle login/logout
+    setupAuthStateListener() {
+        if (window.auth) {
+            window.onAuthStateChanged(window.auth, (user) => {
+                console.log("🔄 Auth state changed:", user ? user.email : "No user");
+                
+                if (user) {
+                    // User is logged in
+                    console.log("✅ User logged in:", user.email);
+                    this.auth.user = user;
+                    this.startGame();
+                } else {
+                    // User is logged out
+                    console.log("❌ User logged out");
+                    this.auth.user = null;
+                    this.showLogin();
+                }
+            });
+        }
     }
     
     async startGame() {
@@ -222,6 +247,9 @@ class AdventureGame {
         
         // Update camera
         this.camera.update();
+        
+        // Update feedback system
+        this.feedback.update();
     }
     
     render() {
@@ -566,6 +594,56 @@ class MapManager {
         const mapHeight = this.height * this.tileSize;
         
         ctx.drawImage(this.worldMap, 0, 0, mapWidth, mapHeight);
+        
+        // Render home alert if there's unread feedback
+        if (this.hasUnreadFeedback) {
+            this.renderHomeAlert(ctx);
+        }
+    }
+    
+    renderHomeAlert(ctx) {
+        const homeX = 100; // Home position X
+        const homeY = 100; // Home position Y
+        const alertRadius = 30;
+        const time = Date.now() * 0.003; // Animation time
+        
+        // Save context state
+        ctx.save();
+        
+        // Set up glowing effect
+        const gradient = ctx.createRadialGradient(
+            homeX, homeY, 0,
+            homeX, homeY, alertRadius
+        );
+        
+        // Create pulsing red glow
+        const alpha = 0.3 + 0.2 * Math.sin(time);
+        gradient.addColorStop(0, `rgba(255, 0, 0, ${alpha})`);
+        gradient.addColorStop(0.7, `rgba(255, 0, 0, ${alpha * 0.5})`);
+        gradient.addColorStop(1, 'rgba(255, 0, 0, 0)');
+        
+        // Draw glowing circle
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(homeX, homeY, alertRadius, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Draw alert icon
+        ctx.fillStyle = '#ff0000';
+        ctx.font = 'bold 20px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('!', homeX, homeY);
+        
+        // Draw pulsing border
+        ctx.strokeStyle = `rgba(255, 0, 0, ${0.5 + 0.3 * Math.sin(time)})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(homeX, homeY, alertRadius - 5, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Restore context state
+        ctx.restore();
     }
 }
 
@@ -905,6 +983,14 @@ class UIManager {
         }
     }
     
+    // Helper method to check if quest is expired
+    isQuestExpired(endTime) {
+        if (!endTime) return false;
+        const now = new Date();
+        const end = new Date(endTime);
+        return end <= now;
+    }
+
     updatePlayerQuests(quests) {
         const questContent = document.querySelector('.quest-content');
         if (!questContent) return;
@@ -916,15 +1002,18 @@ class UIManager {
         
         questContent.innerHTML = quests.map(quest => {
             const timerInfo = this.game.auth.formatQuestTimeRemaining(quest.endTime);
+            const isPlayerDone = quest.status === 'player_done';
+            const isCompleted = quest.status === 'completed';
+            const isExpired = this.isQuestExpired(quest.endTime);
             
             return `
-                <div class="quest-item" data-quest-id="${quest.id}">
+                <div class="quest-item ${isPlayerDone ? 'quest-player-done' : ''} ${isCompleted ? 'quest-completed' : ''} ${isExpired ? 'quest-expired' : ''}" data-quest-id="${quest.id}">
                     <div class="quest-header">
                         <div class="quest-logo">${quest.logo || '📍'}</div>
                         <div class="quest-info">
                             <div class="quest-title">${quest.name}</div>
                             <div class="quest-timer ${timerInfo.class}" data-end-time="${quest.endTime}">
-                                ${timerInfo.text}
+                                ${isCompleted ? '✅ Completed' : isPlayerDone ? '⏳ Waiting for Approval' : timerInfo.text}
                             </div>
                         </div>
                     </div>
@@ -933,13 +1022,27 @@ class UIManager {
                         <span class="reward-badge reward-xp">+${quest.xpReward || 0} XP</span>
                         <span class="reward-badge reward-coins">+${quest.coinsReward || 0} DZD</span>
                     </div>
-                    ${quest.verificationLink ? `
-                        <div class="quest-verification">
+                    <div class="quest-actions">
+                        ${quest.verificationLink ? `
                             <button class="verification-btn" onclick="window.open('${quest.verificationLink}', '_blank')">
                                 ${quest.verificationName || 'Verify Quest'}
                             </button>
-                        </div>
-                    ` : ''}
+                        ` : ''}
+                        ${isCompleted ? `
+                            <button class="done-btn completed" disabled>
+                                ✅ Completed
+                            </button>
+                        ` : isPlayerDone ? `
+                            <button class="done-btn waiting-approval" disabled>
+                                ⏳ Waiting for Approval
+                            </button>
+                        ` : `
+                            <button class="done-btn" onclick="window.game.ui.handleQuestDone('${quest.id}')" 
+                                    ${isExpired ? 'disabled' : ''}>
+                                Done
+                            </button>
+                        `}
+                    </div>
                 </div>
             `;
         }).join('');
@@ -970,8 +1073,14 @@ class UIManager {
                 const timeLeft = endTime - now;
                 
                 if (timeLeft <= 0) {
-                    timerElement.textContent = 'Expired';
+                    // Quest has expired - show time since expiration
+                    const timeSinceExpiry = Math.abs(timeLeft);
+                    const expiredText = this.formatTimeSinceExpiry(timeSinceExpiry);
+                    timerElement.textContent = `Expired ${expiredText} ago`;
                     timerElement.className = 'quest-timer expired';
+                    
+                    // Add expired styling to the entire quest item
+                    item.classList.add('quest-expired');
                 } else {
                     const hours = Math.floor(timeLeft / (1000 * 60 * 60));
                     const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
@@ -984,6 +1093,9 @@ class UIManager {
                     } else {
                         timerElement.textContent = `${seconds}s`;
                     }
+                    
+                    // Remove expired styling
+                    item.classList.remove('quest-expired');
                     
                     // Change styling based on time remaining
                     if (timeLeft < 60000) { // Less than 1 minute
@@ -1001,6 +1113,194 @@ class UIManager {
     updateQuestProgress(stats) {
         // This method is now handled by updatePlayerQuests
         // Keeping it for backward compatibility but it's no longer used
+    }
+    
+    // Handle quest completion
+    async handleQuestDone(questId) {
+        // Find the quest item
+        const questItem = document.querySelector(`[data-quest-id="${questId}"]`);
+        if (!questItem) return;
+        
+        // Check if quest is expired
+        const timerElement = questItem.querySelector('.quest-timer');
+        if (timerElement && timerElement.dataset.endTime) {
+            const endTime = new Date(timerElement.dataset.endTime);
+            const now = new Date();
+            if (endTime <= now) {
+                this.showBottomNotification('❌ Cannot complete expired quest', 'error');
+                return;
+            }
+        }
+        
+        // Show confirmation popup
+        const confirmed = await this.showQuestCompletionConfirmation();
+        if (!confirmed) return;
+        
+        try {
+            // Mark quest as player_done in Firebase (waiting for admin approval)
+            await this.markQuestAsPlayerDone(questId);
+            
+            // Update UI to show quest as player_done (green but waiting for approval)
+            questItem.classList.add('quest-player-done');
+            questItem.classList.remove('quest-expired');
+            
+            // Disable the done button
+            const doneBtn = questItem.querySelector('.done-btn');
+            if (doneBtn) {
+                doneBtn.disabled = true;
+                doneBtn.textContent = 'Waiting for Approval';
+                doneBtn.classList.add('waiting-approval');
+            }
+            
+            // Show success notification
+            this.showBottomNotification('✅ Quest submitted! Waiting for admin approval.', 'success');
+            
+        } catch (error) {
+            console.error('Error completing quest:', error);
+            this.showBottomNotification('❌ Failed to submit quest', 'error');
+        }
+    }
+    
+    // Show quest completion confirmation popup
+    showQuestCompletionConfirmation() {
+        return new Promise((resolve) => {
+            // Create modal overlay
+            const modal = document.createElement('div');
+            modal.className = 'quest-confirmation-modal';
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 10000;
+                backdrop-filter: blur(5px);
+                -webkit-backdrop-filter: blur(5px);
+            `;
+            
+            // Create modal content
+            const modalContent = document.createElement('div');
+            modalContent.style.cssText = `
+                background: rgba(255, 255, 255, 0.95);
+                border-radius: 20px;
+                padding: 30px;
+                text-align: center;
+                max-width: 400px;
+                width: 90%;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+            `;
+            
+            modalContent.innerHTML = `
+                <div style="font-size: 48px; margin-bottom: 20px;">🤔</div>
+                <h3 style="margin: 0 0 15px 0; color: #333; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                    Are you sure you finished your task?
+                </h3>
+                <p style="margin: 0 0 25px 0; color: #666; font-size: 14px;">
+                    This action cannot be undone. Make sure you have completed all requirements.
+                </p>
+                <div style="display: flex; gap: 15px; justify-content: center;">
+                    <button id="confirm-cancel" style="
+                        background: rgba(255, 59, 48, 0.1);
+                        color: #ff3b30;
+                        border: 2px solid rgba(255, 59, 48, 0.3);
+                        padding: 12px 24px;
+                        border-radius: 12px;
+                        font-size: 14px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: all 0.2s ease;
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    ">Cancel</button>
+                    <button id="confirm-sure" style="
+                        background: rgba(52, 199, 89, 0.9);
+                        color: white;
+                        border: 2px solid rgba(52, 199, 89, 0.3);
+                        padding: 12px 24px;
+                        border-radius: 12px;
+                        font-size: 14px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: all 0.2s ease;
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    ">Sure</button>
+                </div>
+            `;
+            
+            modal.appendChild(modalContent);
+            document.body.appendChild(modal);
+            
+            // Add hover effects
+            const cancelBtn = modalContent.querySelector('#confirm-cancel');
+            const sureBtn = modalContent.querySelector('#confirm-sure');
+            
+            cancelBtn.addEventListener('mouseenter', () => {
+                cancelBtn.style.background = 'rgba(255, 59, 48, 0.2)';
+                cancelBtn.style.borderColor = 'rgba(255, 59, 48, 0.5)';
+            });
+            cancelBtn.addEventListener('mouseleave', () => {
+                cancelBtn.style.background = 'rgba(255, 59, 48, 0.1)';
+                cancelBtn.style.borderColor = 'rgba(255, 59, 48, 0.3)';
+            });
+            
+            sureBtn.addEventListener('mouseenter', () => {
+                sureBtn.style.background = 'rgba(52, 199, 89, 1)';
+                sureBtn.style.borderColor = 'rgba(52, 199, 89, 0.5)';
+            });
+            sureBtn.addEventListener('mouseleave', () => {
+                sureBtn.style.background = 'rgba(52, 199, 89, 0.9)';
+                sureBtn.style.borderColor = 'rgba(52, 199, 89, 0.3)';
+            });
+            
+            // Handle button clicks
+            cancelBtn.addEventListener('click', () => {
+                document.body.removeChild(modal);
+                resolve(false);
+            });
+            
+            sureBtn.addEventListener('click', () => {
+                document.body.removeChild(modal);
+                resolve(true);
+            });
+            
+            // Handle escape key
+            const handleEscape = (e) => {
+                if (e.key === 'Escape') {
+                    document.body.removeChild(modal);
+                    document.removeEventListener('keydown', handleEscape);
+                    resolve(false);
+                }
+            };
+            document.addEventListener('keydown', handleEscape);
+        });
+    }
+    
+    // Mark quest as player_done in Firebase (waiting for admin approval)
+    async markQuestAsPlayerDone(questId) {
+        if (!window.db) {
+            throw new Error('Firebase not initialized');
+        }
+        
+        try {
+            // Update quest status in Firebase
+            const questRef = window.doc(window.db, 'quests', questId);
+            await window.updateDoc(questRef, {
+                status: 'player_done',
+                playerDoneAt: new Date().toISOString(),
+                playerDoneBy: this.game.auth.user?.uid || this.game.auth.user?.email
+            });
+            
+            console.log('✅ Quest marked as player_done in Firebase (waiting for admin approval)');
+        } catch (error) {
+            console.error('❌ Error updating quest in Firebase:', error);
+            throw error;
+        }
     }
     
     render(ctx) {
@@ -1122,9 +1422,21 @@ class AuthManager {
             loginForm.addEventListener('submit', (e) => this.handleLogin(e));
         }
         
+        // Stats HUD buttons
         const logoutButton = document.getElementById('logoutButton');
         if (logoutButton) {
             logoutButton.addEventListener('click', () => this.handleLogout());
+        }
+        
+        const hudRefreshButton = document.getElementById('hudRefreshButton');
+        if (hudRefreshButton) {
+            hudRefreshButton.addEventListener('click', () => this.handleHudRefresh());
+        }
+        
+        // Login form refresh button
+        const refreshButton = document.getElementById('refreshButton');
+        if (refreshButton) {
+            refreshButton.addEventListener('click', () => this.handleRefresh());
         }
     }
     
@@ -1263,6 +1575,224 @@ class AuthManager {
         } catch (error) {
             console.error('Logout error:', error);
         }
+    }
+    
+        handleRefresh() {
+            const refreshButton = document.getElementById('refreshButton');
+            if (!refreshButton) return;
+
+            // Check if button is already disabled
+            if (refreshButton.disabled) {
+                console.log('⏳ Refresh button is on cooldown...');
+                return;
+            }
+
+            console.log('🔄 Refreshing page...');
+
+            // Disable the button for 5 seconds
+            refreshButton.disabled = true;
+            refreshButton.style.opacity = '0.5';
+            refreshButton.style.cursor = 'not-allowed';
+
+            // Add visual feedback
+            refreshButton.style.transform = 'scale(0.95)';
+
+            // Start cooldown timer
+            let cooldownTime = 5;
+            const originalTitle = refreshButton.title;
+            
+            const updateCooldown = () => {
+                refreshButton.title = `Refresh Page (${cooldownTime}s)`;
+                cooldownTime--;
+                
+                if (cooldownTime < 0) {
+                    // Re-enable the button
+                    refreshButton.disabled = false;
+                    refreshButton.style.opacity = '1';
+                    refreshButton.style.cursor = 'pointer';
+                    refreshButton.style.transform = 'scale(1)';
+                    refreshButton.title = originalTitle;
+                    console.log('✅ Refresh button ready again');
+                } else {
+                    setTimeout(updateCooldown, 1000);
+                }
+            };
+
+            // Start cooldown countdown
+            setTimeout(updateCooldown, 1000);
+
+            // Refresh the page after a short delay
+            setTimeout(() => {
+                window.location.reload();
+            }, 150);
+        }
+    
+    async handleHudRefresh() {
+        console.log('🔄 HUD Refresh button clicked');
+        
+        const hudRefreshButton = document.getElementById('hudRefreshButton');
+        if (hudRefreshButton) {
+            // Add visual feedback
+            hudRefreshButton.style.transform = 'scale(0.95) rotate(180deg)';
+            hudRefreshButton.style.opacity = '0.7';
+            
+            // Disable button temporarily
+            hudRefreshButton.disabled = true;
+        }
+        
+        try {
+            // Refresh user stats from Firestore
+            if (this.user) {
+                await this.loadUserStats();
+                console.log('✅ User stats refreshed');
+            }
+            
+            // Refresh player quests
+            if (this.game && this.game.ui) {
+                await this.loadPlayerQuests();
+                console.log('✅ Player quests refreshed');
+            }
+            
+            // Show success feedback
+            this.showHudRefreshSuccess();
+            
+        } catch (error) {
+            console.error('❌ Error refreshing HUD data:', error);
+            this.showHudRefreshError();
+        } finally {
+            // Re-enable button and reset visual state
+            if (hudRefreshButton) {
+                setTimeout(() => {
+                    hudRefreshButton.style.transform = 'scale(1) rotate(0deg)';
+                    hudRefreshButton.style.opacity = '1';
+                    hudRefreshButton.disabled = false;
+                }, 1000);
+            }
+        }
+    }
+    
+    showHudRefreshSuccess() {
+        this.showBottomNotification('✅ Stats refreshed', 'success');
+    }
+    
+    showHudRefreshError() {
+        this.showBottomNotification('❌ Refresh failed', 'error');
+    }
+    
+    /**
+     * Show notification at the bottom of the screen
+     * @param {string} message - The notification message
+     * @param {string} type - The notification type (success, error, info, warning)
+     * @param {number} duration - How long to show the notification (default: 3000ms)
+     */
+    showBottomNotification(message, type = 'info', duration = 3000) {
+        // Remove any existing notifications to prevent stacking
+        const existingNotifications = document.querySelectorAll('.bottom-notification');
+        existingNotifications.forEach(notification => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        });
+        
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.className = 'bottom-notification';
+        
+        // Set colors based on type
+        let backgroundColor, textColor, icon;
+        switch (type) {
+            case 'success':
+                backgroundColor = 'rgba(52, 199, 89, 0.9)';
+                textColor = 'white';
+                icon = '✅';
+                break;
+            case 'error':
+                backgroundColor = 'rgba(255, 59, 48, 0.9)';
+                textColor = 'white';
+                icon = '❌';
+                break;
+            case 'warning':
+                backgroundColor = 'rgba(255, 149, 0, 0.9)';
+                textColor = 'white';
+                icon = '⚠️';
+                break;
+            case 'info':
+            default:
+                backgroundColor = 'rgba(0, 122, 255, 0.9)';
+                textColor = 'white';
+                icon = 'ℹ️';
+                break;
+        }
+        
+        // Apply styles
+        notification.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: ${backgroundColor};
+            color: ${textColor};
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            z-index: 10000;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            max-width: 90vw;
+            text-align: center;
+            animation: slideUpIn 0.3s ease-out;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        `;
+        
+        // Set content
+        notification.innerHTML = `${icon} ${message}`;
+        
+        // Add to page
+        document.body.appendChild(notification);
+        
+        // Add CSS animation if not already added
+        if (!document.getElementById('bottom-notification-styles')) {
+            const style = document.createElement('style');
+            style.id = 'bottom-notification-styles';
+            style.textContent = `
+                @keyframes slideUpIn {
+                    from {
+                        opacity: 0;
+                        transform: translateX(-50%) translateY(20px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateX(-50%) translateY(0);
+                    }
+                }
+                @keyframes slideDownOut {
+                    from {
+                        opacity: 1;
+                        transform: translateX(-50%) translateY(0);
+                    }
+                    to {
+                        opacity: 0;
+                        transform: translateX(-50%) translateY(20px);
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        // Remove after duration
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.style.animation = 'slideDownOut 0.3s ease-in';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }
+        }, duration);
     }
     
     setLoginLoading(loading) {
@@ -1522,7 +2052,9 @@ class AuthManager {
         const timeLeft = end - now;
         
         if (timeLeft <= 0) {
-            return { text: 'Expired', class: 'expired' };
+            const timeSinceExpiry = Math.abs(timeLeft);
+            const expiredText = this.formatTimeSinceExpiry(timeSinceExpiry);
+            return { text: `Expired ${expiredText} ago`, class: 'expired' };
         }
         
         const hours = Math.floor(timeLeft / (1000 * 60 * 60));
@@ -1546,6 +2078,24 @@ class AuthManager {
         }
         
         return { text, class: className };
+    }
+    
+    // Format time since expiry
+    formatTimeSinceExpiry(timeSinceExpiry) {
+        const days = Math.floor(timeSinceExpiry / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((timeSinceExpiry % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((timeSinceExpiry % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((timeSinceExpiry % (1000 * 60)) / 1000);
+        
+        if (days > 0) {
+            return `${days}d ${hours}h`;
+        } else if (hours > 0) {
+            return `${hours}h ${minutes}m`;
+        } else if (minutes > 0) {
+            return `${minutes}m ${seconds}s`;
+        } else {
+            return `${seconds}s`;
+        }
     }
     
     
@@ -1613,63 +2163,7 @@ class AuthManager {
     
     // Show notification when stats are updated externally
     showStatUpdateNotification() {
-        // Create a temporary notification
-        const notification = document.createElement('div');
-        notification.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: linear-gradient(135deg, #4CAF50, #45a049);
-            color: white;
-            padding: 15px 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            z-index: 10000;
-            font-family: 'Arial', sans-serif;
-            font-size: 14px;
-            font-weight: 600;
-            max-width: 300px;
-            animation: slideInRight 0.3s ease-out;
-        `;
-        
-        notification.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 10px;">
-                <span style="font-size: 18px;">📊</span>
-                <div>
-                    <div style="font-weight: 700; margin-bottom: 2px;">Stats Updated!</div>
-                    <div style="font-size: 12px; opacity: 0.9;">Your progress has been updated</div>
-                </div>
-            </div>
-        `;
-        
-        // Add CSS animation
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes slideInRight {
-                from { transform: translateX(100%); opacity: 0; }
-                to { transform: translateX(0); opacity: 1; }
-            }
-            @keyframes slideOutRight {
-                from { transform: translateX(0); opacity: 1; }
-                to { transform: translateX(100%); opacity: 0; }
-            }
-        `;
-        document.head.appendChild(style);
-        
-        document.body.appendChild(notification);
-        
-        // Auto-remove after 4 seconds
-        setTimeout(() => {
-            notification.style.animation = 'slideOutRight 0.3s ease-in';
-            setTimeout(() => {
-                if (notification.parentNode) {
-                    notification.parentNode.removeChild(notification);
-                }
-                if (style.parentNode) {
-                    style.parentNode.removeChild(style);
-                }
-            }, 300);
-        }, 4000);
+        this.showBottomNotification('📊 Stats Updated! Your progress has been updated', 'success', 4000);
     }
     
     // Debug method to check what's in Firestore (call from browser console)
@@ -1696,6 +2190,383 @@ class AuthManager {
         } catch (error) {
             console.error("❌ Debug error:", error);
         }
+    }
+}
+
+/**
+ * FeedbackManager - Handles player feedback system
+ */
+class FeedbackManager {
+    constructor(game) {
+        this.game = game;
+        this.playerFeedbacks = [];
+        this.unreadCount = 0;
+        this.homePosition = { x: 100, y: 100 }; // Home position on map
+        this.proximityRadius = 80; // Distance to show "See Feedbacks" button
+        this.isNearHome = false;
+        this.feedbackButton = null;
+        this.feedbackModal = null;
+        
+        this.init();
+    }
+    
+    init() {
+        console.log('📝 Initializing Feedback Manager...');
+        this.createFeedbackButton();
+        this.createFeedbackModal();
+        this.loadPlayerFeedbacks();
+        
+        // Check for unread feedbacks every 30 seconds
+        setInterval(() => {
+            this.loadPlayerFeedbacks();
+        }, 30000);
+    }
+    
+    createFeedbackButton() {
+        // Create "See Feedbacks" button
+        this.feedbackButton = document.createElement('button');
+        this.feedbackButton.id = 'feedbackButton';
+        this.feedbackButton.innerHTML = '📝 See Feedbacks';
+        this.feedbackButton.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
+            transition: all 0.3s ease;
+            z-index: 1000;
+            display: none;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        `;
+        
+        // Add hover effects
+        this.feedbackButton.addEventListener('mouseenter', () => {
+            this.feedbackButton.style.transform = 'translateX(-50%) translateY(-2px)';
+            this.feedbackButton.style.boxShadow = '0 6px 20px rgba(0, 123, 255, 0.4)';
+        });
+        
+        this.feedbackButton.addEventListener('mouseleave', () => {
+            this.feedbackButton.style.transform = 'translateX(-50%) translateY(0)';
+            this.feedbackButton.style.boxShadow = '0 4px 15px rgba(0, 123, 255, 0.3)';
+        });
+        
+        this.feedbackButton.addEventListener('click', () => {
+            this.showFeedbackModal();
+        });
+        
+        document.body.appendChild(this.feedbackButton);
+    }
+    
+    createFeedbackModal() {
+        // Create feedback modal
+        this.feedbackModal = document.createElement('div');
+        this.feedbackModal.id = 'feedbackModal';
+        this.feedbackModal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+        `;
+        
+        this.feedbackModal.innerHTML = `
+            <div class="feedback-modal-content" style="
+                background: rgba(255, 255, 255, 0.95);
+                border-radius: 20px;
+                padding: 30px;
+                max-width: 90%;
+                width: 600px;
+                max-height: 80vh;
+                overflow-y: auto;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+            ">
+                <div class="feedback-modal-header" style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 20px;
+                    padding-bottom: 15px;
+                    border-bottom: 2px solid rgba(0, 123, 255, 0.2);
+                ">
+                    <h2 style="margin: 0; color: #333; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                        📝 Your Feedbacks
+                    </h2>
+                    <button id="closeFeedbackModal" style="
+                        background: none;
+                        border: none;
+                        font-size: 24px;
+                        cursor: pointer;
+                        color: #666;
+                        padding: 5px;
+                        border-radius: 50%;
+                        width: 35px;
+                        height: 35px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        transition: all 0.2s ease;
+                    ">&times;</button>
+                </div>
+                <div class="feedback-list" id="feedbackList">
+                    <!-- Feedbacks will be loaded here -->
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(this.feedbackModal);
+        
+        // Add close functionality
+        const closeBtn = this.feedbackModal.querySelector('#closeFeedbackModal');
+        closeBtn.addEventListener('click', () => {
+            this.hideFeedbackModal();
+        });
+        
+        // Close on overlay click
+        this.feedbackModal.addEventListener('click', (e) => {
+            if (e.target === this.feedbackModal) {
+                this.hideFeedbackModal();
+            }
+        });
+    }
+    
+    async loadPlayerFeedbacks() {
+        if (!this.game.auth.user || !window.db) return;
+        
+        try {
+            console.log('📝 Loading player feedbacks...');
+            
+            // Get player's feedback collection
+            const playerFeedbackRef = window.doc(window.db, 'playerFeedback', this.game.auth.user.uid);
+            const playerFeedbackSnap = await window.getDoc(playerFeedbackRef);
+            
+            if (playerFeedbackSnap.exists()) {
+                const data = playerFeedbackSnap.data();
+                this.playerFeedbacks = data.feedbacks || [];
+            } else {
+                this.playerFeedbacks = [];
+            }
+            
+            // Count unread feedbacks
+            this.unreadCount = this.playerFeedbacks.filter(feedback => feedback.status === 'unread').length;
+            
+            console.log(`📝 Loaded ${this.playerFeedbacks.length} feedbacks, ${this.unreadCount} unread`);
+            
+            // Update home alert
+            this.updateHomeAlert();
+            
+        } catch (error) {
+            console.error('❌ Error loading player feedbacks:', error);
+        }
+    }
+    
+    updateHomeAlert() {
+        // This will be called by the map rendering system
+        // For now, we'll store the unread count for the map to use
+        this.game.map.hasUnreadFeedback = this.unreadCount > 0;
+    }
+    
+    showFeedbackModal() {
+        this.feedbackModal.style.display = 'flex';
+        this.renderFeedbackList();
+    }
+    
+    hideFeedbackModal() {
+        this.feedbackModal.style.display = 'none';
+    }
+    
+    renderFeedbackList() {
+        const feedbackList = this.feedbackModal.querySelector('#feedbackList');
+        
+        if (this.playerFeedbacks.length === 0) {
+            feedbackList.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: #666;">
+                    <div style="font-size: 48px; margin-bottom: 20px;">📝</div>
+                    <h3 style="margin: 0 0 10px 0;">No feedbacks yet</h3>
+                    <p style="margin: 0;">You'll see feedbacks from admins here when they send them.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        // Sort feedbacks by date (newest first)
+        const sortedFeedbacks = this.playerFeedbacks.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        
+        feedbackList.innerHTML = sortedFeedbacks.map(feedback => `
+            <div class="feedback-item" style="
+                background: ${feedback.status === 'unread' ? 'rgba(0, 123, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'};
+                border: 2px solid ${feedback.status === 'unread' ? 'rgba(0, 123, 255, 0.3)' : 'rgba(0, 0, 0, 0.1)'};
+                border-radius: 15px;
+                padding: 20px;
+                margin-bottom: 15px;
+                transition: all 0.3s ease;
+                position: relative;
+            ">
+                <div class="feedback-header" style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 15px;
+                ">
+                    <div class="feedback-type" style="
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                        font-weight: 600;
+                        color: ${feedback.type === 'positive' ? '#28a745' : '#dc3545'};
+                    ">
+                        <span style="font-size: 20px;">${feedback.type === 'positive' ? '✅' : '❌'}</span>
+                        <span>${feedback.type.toUpperCase()}</span>
+                    </div>
+                    <div class="feedback-time" style="
+                        color: #666;
+                        font-size: 14px;
+                    ">
+                        ${new Date(feedback.timestamp).toLocaleString()}
+                    </div>
+                </div>
+                
+                <div class="feedback-content">
+                    <h4 style="margin: 0 0 10px 0; color: #333; font-size: 18px;">
+                        ${feedback.title}
+                    </h4>
+                    <p style="margin: 0 0 15px 0; color: #555; line-height: 1.5;">
+                        ${feedback.message}
+                    </p>
+                    <div style="
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                    ">
+                        <div style="color: #666; font-size: 14px;">
+                            From: <strong>${feedback.sentByName || 'Admin'}</strong>
+                        </div>
+                        ${feedback.status === 'unread' ? `
+                            <button class="mark-read-btn" data-feedback-id="${feedback.id}" style="
+                                background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+                                color: white;
+                                border: none;
+                                padding: 8px 16px;
+                                border-radius: 20px;
+                                font-size: 14px;
+                                font-weight: 600;
+                                cursor: pointer;
+                                transition: all 0.3s ease;
+                                box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
+                            ">
+                                Mark as Read
+                            </button>
+                        ` : `
+                            <span style="
+                                color: #28a745;
+                                font-weight: 600;
+                                font-size: 14px;
+                                display: flex;
+                                align-items: center;
+                                gap: 5px;
+                            ">
+                                ✅ Read
+                            </span>
+                        `}
+                    </div>
+                </div>
+            </div>
+        `).join('');
+        
+        // Add event listeners for mark as read buttons
+        this.feedbackModal.querySelectorAll('.mark-read-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const feedbackId = e.target.getAttribute('data-feedback-id');
+                this.markFeedbackAsRead(feedbackId);
+            });
+        });
+    }
+    
+    async markFeedbackAsRead(feedbackId) {
+        try {
+            console.log('📝 Marking feedback as read:', feedbackId);
+            
+            // Update local data
+            const feedback = this.playerFeedbacks.find(f => f.id === feedbackId);
+            if (feedback) {
+                feedback.status = 'read';
+                feedback.readAt = new Date().toISOString();
+            }
+            
+            // Update in Firebase
+            const playerFeedbackRef = window.doc(window.db, 'playerFeedback', this.game.auth.user.uid);
+            await window.updateDoc(playerFeedbackRef, {
+                feedbacks: this.playerFeedbacks,
+                lastUpdated: new Date().toISOString()
+            });
+            
+            // Notify admin dashboard
+            if (window.markFeedbackAsReadByPlayer) {
+                await window.markFeedbackAsReadByPlayer(feedbackId, this.game.auth.user.uid);
+            }
+            
+            // Update UI
+            this.renderFeedbackList();
+            this.loadPlayerFeedbacks(); // Refresh unread count
+            
+            // Show success notification
+            this.game.auth.showBottomNotification('✅ Feedback marked as read', 'success');
+            
+        } catch (error) {
+            console.error('❌ Error marking feedback as read:', error);
+            this.game.auth.showBottomNotification('❌ Failed to mark feedback as read', 'error');
+        }
+    }
+    
+    checkProximityToHome() {
+        if (!this.game.player) return;
+        
+        const playerX = this.game.player.x;
+        const playerY = this.game.player.y;
+        const distance = Math.sqrt(
+            Math.pow(playerX - this.homePosition.x, 2) + 
+            Math.pow(playerY - this.homePosition.y, 2)
+        );
+        
+        const wasNearHome = this.isNearHome;
+        this.isNearHome = distance <= this.proximityRadius;
+        
+        // Show/hide feedback button based on proximity and unread count
+        if (this.isNearHome && this.unreadCount > 0) {
+            this.feedbackButton.style.display = 'block';
+        } else {
+            this.feedbackButton.style.display = 'none';
+        }
+        
+        // Show notification when approaching home with unread feedback
+        if (this.isNearHome && !wasNearHome && this.unreadCount > 0) {
+            this.game.auth.showBottomNotification(
+                `📝 You have ${this.unreadCount} unread feedback${this.unreadCount > 1 ? 's' : ''}!`, 
+                'info', 
+                3000
+            );
+        }
+    }
+    
+    update() {
+        this.checkProximityToHome();
     }
 }
 
