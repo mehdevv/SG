@@ -24,6 +24,7 @@ class AdventureGame {
         this.ui = new UIManager(this);
         this.auth = new AuthManager(this);
         this.feedback = new FeedbackManager(this);
+        this.houseInteraction = new HouseInteractionManager(this);
         
         // Start the game
         this.init();
@@ -250,6 +251,9 @@ class AdventureGame {
         
         // Update feedback system
         this.feedback.update();
+        
+        // Update house interaction system
+        this.houseInteraction.update();
     }
     
     render() {
@@ -995,60 +999,89 @@ class UIManager {
         const questContent = document.querySelector('.quest-content');
         if (!questContent) return;
         
+        // Use DocumentFragment for better performance
+        const fragment = document.createDocumentFragment();
+        
         if (quests.length === 0) {
-            questContent.innerHTML = '<div class="no-quests">No active quests</div>';
-            return;
+            const noQuestsDiv = document.createElement('div');
+            noQuestsDiv.className = 'no-quests';
+            noQuestsDiv.textContent = 'No active quests';
+            fragment.appendChild(noQuestsDiv);
+        } else {
+            // Create quest elements efficiently
+            quests.forEach(quest => {
+                const questElement = this.createQuestElement(quest);
+                fragment.appendChild(questElement);
+            });
         }
         
-        questContent.innerHTML = quests.map(quest => {
-            const timerInfo = this.game.auth.formatQuestTimeRemaining(quest.endTime);
-            const isPlayerDone = quest.status === 'player_done';
-            const isCompleted = quest.status === 'completed';
-            const isExpired = this.isQuestExpired(quest.endTime);
-            
-            return `
-                <div class="quest-item ${isPlayerDone ? 'quest-player-done' : ''} ${isCompleted ? 'quest-completed' : ''} ${isExpired ? 'quest-expired' : ''}" data-quest-id="${quest.id}">
-                    <div class="quest-header">
-                        <div class="quest-logo">${quest.logo || '📍'}</div>
-                        <div class="quest-info">
-                            <div class="quest-title">${quest.name}</div>
-                            <div class="quest-timer ${timerInfo.class}" data-end-time="${quest.endTime}">
-                                ${isCompleted ? '✅ Completed' : isPlayerDone ? '⏳ Waiting for Approval' : timerInfo.text}
-                            </div>
-                        </div>
-                    </div>
-                    <div class="quest-description">${quest.description}</div>
-                    <div class="quest-rewards">
-                        <span class="reward-badge reward-xp">+${quest.xpReward || 0} XP</span>
-                        <span class="reward-badge reward-coins">+${quest.coinsReward || 0} DZD</span>
-                    </div>
-                    <div class="quest-actions">
-                        ${quest.verificationLink ? `
-                            <button class="verification-btn" onclick="window.open('${quest.verificationLink}', '_blank')">
-                                ${quest.verificationName || 'Verify Quest'}
-                            </button>
-                        ` : ''}
-                        ${isCompleted ? `
-                            <button class="done-btn completed" disabled>
-                                ✅ Completed
-                            </button>
-                        ` : isPlayerDone ? `
-                            <button class="done-btn waiting-approval" disabled>
-                                ⏳ Waiting for Approval
-                            </button>
-                        ` : `
-                            <button class="done-btn" onclick="window.game.ui.handleQuestDone('${quest.id}')" 
-                                    ${isExpired ? 'disabled' : ''}>
-                                Done
-                            </button>
-                        `}
-                    </div>
-                </div>
-            `;
-        }).join('');
+        // Clear and append all at once
+        questContent.innerHTML = '';
+        questContent.appendChild(fragment);
         
         // Start quest timer updates
         this.startQuestTimerUpdates();
+    }
+    
+    createQuestElement(quest) {
+        const timerInfo = this.game.auth.formatQuestTimeRemaining(quest.endTime);
+        const isPlayerDone = quest.status === 'player_done';
+        const isCompleted = quest.status === 'completed';
+        const isExpired = this.isQuestExpired(quest.endTime);
+        
+        const questDiv = document.createElement('div');
+        questDiv.className = `quest-item ${isPlayerDone ? 'quest-player-done' : ''} ${isCompleted ? 'quest-completed' : ''} ${isExpired ? 'quest-expired' : ''}`;
+        questDiv.setAttribute('data-quest-id', quest.id);
+        
+        questDiv.innerHTML = `
+            <div class="quest-header">
+                <div class="quest-logo">${quest.logo || '📍'}</div>
+                <div class="quest-info">
+                    <div class="quest-title">${quest.name}</div>
+                    <div class="quest-timer ${timerInfo.class}" data-end-time="${quest.endTime}">
+                        ${isCompleted ? '✅ Completed' : isPlayerDone ? '⏳ Waiting for Approval' : timerInfo.text}
+                    </div>
+                </div>
+            </div>
+            <div class="quest-description">${quest.description}</div>
+            <div class="quest-rewards">
+                <span class="reward-badge reward-xp">+${quest.xpReward || 0} XP</span>
+                <span class="reward-badge reward-coins">+${quest.coinsReward || 0} DZD</span>
+            </div>
+            <div class="quest-actions">
+                ${quest.verificationLink ? `
+                    <button class="verification-btn" data-verification-link="${quest.verificationLink}">
+                        ${quest.verificationName || 'Verify Quest'}
+                    </button>
+                ` : ''}
+                ${isCompleted ? `
+                    <button class="done-btn completed" disabled>
+                        ✅ Completed
+                    </button>
+                ` : isPlayerDone ? `
+                    <button class="done-btn waiting-approval" disabled>
+                        ⏳ Waiting for Approval
+                    </button>
+                ` : `
+                    <button class="done-btn" data-quest-id="${quest.id}" ${isExpired ? 'disabled' : ''}>
+                        Done
+                    </button>
+                `}
+            </div>
+        `;
+        
+        // Add event listeners using event delegation
+        questDiv.addEventListener('click', (e) => {
+            if (e.target.classList.contains('verification-btn')) {
+                const link = e.target.getAttribute('data-verification-link');
+                if (link) window.open(link, '_blank');
+            } else if (e.target.classList.contains('done-btn') && !e.target.disabled) {
+                const questId = e.target.getAttribute('data-quest-id');
+                if (questId) this.handleQuestDone(questId);
+            }
+        });
+        
+        return questDiv;
     }
     
     startQuestTimerUpdates() {
@@ -1057,54 +1090,71 @@ class UIManager {
             clearInterval(this.questTimerInterval);
         }
         
-        // Update timers every second
+        // Update timers every 2 seconds to reduce lag
         this.questTimerInterval = setInterval(() => {
             this.updateQuestTimers();
-        }, 1000);
+        }, 2000);
     }
     
     updateQuestTimers() {
         const questItems = document.querySelectorAll('.quest-item');
+        const now = new Date(); // Get current time once
+        
         questItems.forEach(item => {
             const timerElement = item.querySelector('.quest-timer');
-            if (timerElement && timerElement.dataset.endTime) {
-                const endTime = new Date(timerElement.dataset.endTime);
-                const now = new Date();
-                const timeLeft = endTime - now;
+            if (!timerElement || !timerElement.dataset.endTime) return;
+            
+            // Check if quest is player_done or completed - don't update timer
+            if (item.classList.contains('quest-player-done') || item.classList.contains('quest-completed')) {
+                return; // Skip timer updates for done/completed quests
+            }
+            
+            const endTime = new Date(timerElement.dataset.endTime);
+            const timeLeft = endTime - now;
+            
+            if (timeLeft <= 0) {
+                // Quest has expired - show time since expiration
+                const timeSinceExpiry = Math.abs(timeLeft);
+                const expiredText = this.game.auth.formatTimeSinceExpiry(timeSinceExpiry);
+                timerElement.textContent = `Expired ${expiredText} ago`;
+                timerElement.className = 'quest-timer expired';
                 
-                if (timeLeft <= 0) {
-                    // Quest has expired - show time since expiration
-                    const timeSinceExpiry = Math.abs(timeLeft);
-                    const expiredText = this.formatTimeSinceExpiry(timeSinceExpiry);
-                    timerElement.textContent = `Expired ${expiredText} ago`;
-                    timerElement.className = 'quest-timer expired';
-                    
-                    // Add expired styling to the entire quest item
-                    item.classList.add('quest-expired');
+                // Add expired styling to the entire quest item
+                item.classList.add('quest-expired');
+            } else {
+                // Only update if the display would change significantly
+                const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+                const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+                
+                let newText;
+                if (hours > 0) {
+                    newText = `${hours}h ${minutes}m`;
+                } else if (minutes > 0) {
+                    newText = `${minutes}m ${seconds}s`;
                 } else {
-                    const hours = Math.floor(timeLeft / (1000 * 60 * 60));
-                    const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-                    const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
-                    
-                    if (hours > 0) {
-                        timerElement.textContent = `${hours}h ${minutes}m`;
-                    } else if (minutes > 0) {
-                        timerElement.textContent = `${minutes}m ${seconds}s`;
-                    } else {
-                        timerElement.textContent = `${seconds}s`;
-                    }
-                    
-                    // Remove expired styling
-                    item.classList.remove('quest-expired');
-                    
-                    // Change styling based on time remaining
-                    if (timeLeft < 60000) { // Less than 1 minute
-                        timerElement.className = 'quest-timer ending';
-                    } else if (timeLeft < 3600000) { // Less than 1 hour
-                        timerElement.className = 'quest-timer ending';
-                    } else {
-                        timerElement.className = 'quest-timer active';
-                    }
+                    newText = `${seconds}s`;
+                }
+                
+                // Only update if text actually changed
+                if (timerElement.textContent !== newText) {
+                    timerElement.textContent = newText;
+                }
+                
+                // Remove expired styling
+                item.classList.remove('quest-expired');
+                
+                // Change styling based on time remaining
+                let newClassName = 'quest-timer active';
+                if (timeLeft < 60000) { // Less than 1 minute
+                    newClassName = 'quest-timer ending';
+                } else if (timeLeft < 3600000) { // Less than 1 hour
+                    newClassName = 'quest-timer ending';
+                }
+                
+                // Only update class if it changed
+                if (timerElement.className !== newClassName) {
+                    timerElement.className = newClassName;
                 }
             }
         });
@@ -1115,8 +1165,15 @@ class UIManager {
         // Keeping it for backward compatibility but it's no longer used
     }
     
-    // Handle quest completion
-    async handleQuestDone(questId) {
+    handleQuestDone(questId) {
+        // Delegate to the auth manager
+        if (this.game.auth && this.game.auth.handleQuestDone) {
+            this.game.auth.handleQuestDone(questId);
+        }
+    }
+    
+    // Handle quest completion (legacy method - keeping for compatibility)
+    async handleQuestDoneLegacy(questId) {
         // Find the quest item
         const questItem = document.querySelector(`[data-quest-id="${questId}"]`);
         if (!questItem) return;
@@ -1154,6 +1211,9 @@ class UIManager {
             
             // Show success notification
             this.showBottomNotification('✅ Quest submitted! Waiting for admin approval.', 'success');
+            
+            // Refresh quest list to show the updated status
+            await this.game.auth.loadPlayerQuests();
             
         } catch (error) {
             console.error('Error completing quest:', error);
@@ -1884,9 +1944,9 @@ class AuthManager {
         try {
             console.log("📋 Loading player quests...");
             
-            // Get all active quests
+            // Get all active and player_done quests
             const questsRef = window.collection(window.db, 'quests');
-            const q = window.query(questsRef, window.where('status', '==', 'active'));
+            const q = window.query(questsRef, window.where('status', 'in', ['active', 'player_done']));
             const querySnapshot = await window.getDocs(q);
             
             const allQuests = [];
@@ -1903,7 +1963,12 @@ class AuthManager {
             for (const quest of allQuests) {
                 let shouldInclude = false;
                 
-                if (!quest.assignedPlayer || quest.assignedPlayer.trim() === '') {
+                // For player_done quests, only show if the player is the one who marked it as done
+                if (quest.status === 'player_done') {
+                    if (quest.playerDoneBy === this.user.uid || quest.playerDoneBy === this.user.email) {
+                        shouldInclude = true;
+                    }
+                } else if (!quest.assignedPlayer || quest.assignedPlayer.trim() === '') {
                     // Quest is assigned to all players
                     shouldInclude = true;
                 } else {
@@ -2158,12 +2223,71 @@ class AuthManager {
         // Also check immediately
         checkForStatUpdates();
         
+        // Setup quest status listener
+        this.setupQuestStatusListener();
+        
         console.log('✅ Real-time stat updates configured');
     }
     
     // Show notification when stats are updated externally
     showStatUpdateNotification() {
         this.showBottomNotification('📊 Stats Updated! Your progress has been updated', 'success', 4000);
+    }
+    
+    // Setup quest status listener to detect when quests are approved
+    setupQuestStatusListener() {
+        console.log('🔄 Setting up quest status listener...');
+        
+        // Listen for custom events from admin dashboard
+        window.addEventListener('questStatusUpdated', (event) => {
+            const { questId, newStatus } = event.detail;
+            console.log('📡 Received quest status update:', { questId, newStatus });
+            
+            // Reload quests to reflect the new status
+            this.loadPlayerQuests();
+            
+            // Show notification if quest was approved
+            if (newStatus === 'completed') {
+                this.showBottomNotification('🎉 Quest approved! You received your rewards!', 'success', 4000);
+            }
+        });
+        
+        // Check localStorage for quest updates (fallback method)
+        const checkForQuestUpdates = () => {
+            try {
+                const questUpdateData = localStorage.getItem('questStatusUpdate');
+                if (questUpdateData) {
+                    const questUpdate = JSON.parse(questUpdateData);
+                    const { questId, newStatus, timestamp } = questUpdate;
+                    
+                    // Check if this update is recent (within last 30 seconds)
+                    const isRecent = (Date.now() - timestamp) < 30000;
+                    
+                    if (isRecent) {
+                        console.log('📡 Received localStorage quest update:', { questId, newStatus });
+                        this.loadPlayerQuests();
+                        
+                        // Show notification if quest was approved
+                        if (newStatus === 'completed') {
+                            this.showBottomNotification('🎉 Quest approved! You received your rewards!', 'success', 4000);
+                        }
+                        
+                        // Clear the update to prevent duplicate processing
+                        localStorage.removeItem('questStatusUpdate');
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking localStorage for quest updates:', error);
+            }
+        };
+        
+        // Check for quest updates every 3 seconds
+        setInterval(checkForQuestUpdates, 3000);
+        
+        // Also check immediately
+        checkForQuestUpdates();
+        
+        console.log('✅ Quest status listener configured');
     }
     
     // Debug method to check what's in Firestore (call from browser console)
@@ -2567,6 +2691,1374 @@ class FeedbackManager {
     
     update() {
         this.checkProximityToHome();
+    }
+}
+
+// House Interaction Manager - Optimized for performance
+class HouseInteractionManager {
+    constructor(game) {
+        this.game = game;
+        this.houseAreas = [];
+        this.interactionButton = null;
+        this.currentHouse = null;
+        this.lastCheckTime = 0;
+        this.checkInterval = 100; // Check every 100ms instead of every frame
+        this.notificationContainer = null;
+        this.lastFeedbackCount = 0;
+        this.loadHouseAreas();
+        this.setupNotificationSystem();
+    }
+    
+    loadHouseAreas() {
+        // Load house interaction areas from the layers of houses.tmj file
+        fetch('layers of houses.tmj')
+            .then(response => response.json())
+            .then(data => {
+                this.houseAreas = [];
+                data.layers.forEach(layer => {
+                    if (layer.name.startsWith('H') && layer.objects && layer.objects.length > 0) {
+                        layer.objects.forEach((obj, index) => {
+                            if (obj.ellipse) {
+                                // Calculate center of ellipse
+                                const centerX = obj.x + (obj.width / 2);
+                                const centerY = obj.y + (obj.height / 2);
+                                const radius = Math.max(obj.width, obj.height) / 2;
+                                
+                                // Map house layers to specific names and types
+                                let houseName, houseType;
+                                switch (layer.name) {
+                                    case 'H1':
+                                        houseName = 'Home';
+                                        houseType = 'home';
+                                        break;
+                                    case 'H2':
+                                        houseName = 'Feedback Center';
+                                        houseType = 'feedback';
+                                        break;
+                                    case 'H3':
+                                        houseName = 'Mission Station';
+                                        houseType = 'missions';
+                                        break;
+                                    case 'H4':
+                                        houseName = 'History Archive';
+                                        houseType = 'history';
+                                        break;
+                                    default:
+                                        houseName = layer.name;
+                                        houseType = 'general';
+                                }
+                                
+                                this.houseAreas.push({
+                                    id: `${layer.name}_${index}`,
+                                    name: houseName,
+                                    type: houseType,
+                                    layerName: layer.name,
+                                    centerX,
+                                    centerY,
+                                    radius,
+                                    width: obj.width,
+                                    height: obj.height,
+                                    x: obj.x,
+                                    y: obj.y
+                                });
+                            }
+                        });
+                    }
+                });
+                console.log('🏠 Loaded house interaction areas:', this.houseAreas);
+            })
+            .catch(error => {
+                console.error('Error loading house areas:', error);
+            });
+    }
+    
+    createInteractionButton() {
+        if (this.interactionButton) return;
+        
+        this.interactionButton = document.createElement('button');
+        this.interactionButton.id = 'house-interaction-btn';
+        this.interactionButton.innerHTML = '🏠 Enter House';
+        this.interactionButton.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            z-index: 1000;
+            display: none;
+            box-shadow: 0 4px 15px rgba(0, 122, 255, 0.3);
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        `;
+        
+        this.interactionButton.addEventListener('click', () => {
+            this.handleHouseInteraction();
+        });
+        
+        this.interactionButton.addEventListener('mouseenter', () => {
+            this.interactionButton.style.transform = 'translateX(-50%) translateY(-2px)';
+            this.interactionButton.style.boxShadow = '0 6px 20px rgba(0, 122, 255, 0.4)';
+        });
+        
+        this.interactionButton.addEventListener('mouseleave', () => {
+            this.interactionButton.style.transform = 'translateX(-50%) translateY(0)';
+            this.interactionButton.style.boxShadow = '0 4px 15px rgba(0, 122, 255, 0.3)';
+        });
+        
+        document.body.appendChild(this.interactionButton);
+    }
+    
+    update() {
+        const now = Date.now();
+        if (now - this.lastCheckTime < this.checkInterval) return;
+        this.lastCheckTime = now;
+        
+        this.checkProximityToHouses();
+    }
+    
+    checkProximityToHouses() {
+        if (!this.game.player || this.houseAreas.length === 0) return;
+        
+        const playerX = this.game.player.x;
+        const playerY = this.game.player.y;
+        let nearestHouse = null;
+        let minDistance = Infinity;
+        
+        // Find the nearest house
+        for (const house of this.houseAreas) {
+            const distance = Math.sqrt(
+                Math.pow(playerX - house.centerX, 2) + 
+                Math.pow(playerY - house.centerY, 2)
+            );
+            
+            if (distance <= house.radius && distance < minDistance) {
+                minDistance = distance;
+                nearestHouse = house;
+            }
+        }
+        
+        // Show/hide interaction button
+        if (nearestHouse && nearestHouse !== this.currentHouse) {
+            this.currentHouse = nearestHouse;
+            this.showInteractionButton(nearestHouse);
+        } else if (!nearestHouse && this.currentHouse) {
+            this.currentHouse = null;
+            this.hideInteractionButton();
+        }
+    }
+    
+    showInteractionButton(house) {
+        if (!this.interactionButton) {
+            this.createInteractionButton();
+        }
+        
+        this.interactionButton.style.display = 'block';
+        this.interactionButton.innerHTML = `🏠 Enter ${house.name}`;
+        
+        // Show notification with house-specific message
+        let notificationMessage;
+        switch (house.type) {
+            case 'home':
+                notificationMessage = `🏠 You're near your home! Click to enter.`;
+                break;
+            case 'feedback':
+                notificationMessage = `📝 You're near the Feedback Center! Click to view your feedback.`;
+                break;
+            case 'missions':
+                notificationMessage = `📋 You're near the Mission Station! Click to submit your daily missions.`;
+                break;
+            case 'history':
+                notificationMessage = `📖 You're near the History Archive! Click to explore.`;
+                break;
+            default:
+                notificationMessage = `🏠 You're near ${house.name}! Click to enter.`;
+        }
+        
+        this.game.auth.showBottomNotification(notificationMessage, 'info', 2000);
+    }
+    
+    hideInteractionButton() {
+        if (this.interactionButton) {
+            this.interactionButton.style.display = 'none';
+        }
+    }
+    
+    handleHouseInteraction() {
+        if (!this.currentHouse) return;
+        
+        // Show house interaction modal
+        this.showHouseModal(this.currentHouse);
+    }
+    
+    showHouseModal(house) {
+        // Create modal if it doesn't exist
+        let modal = document.getElementById('house-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'house-modal';
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                display: none;
+                justify-content: center;
+                align-items: center;
+                z-index: 2000;
+                backdrop-filter: blur(5px);
+                -webkit-backdrop-filter: blur(5px);
+            `;
+            
+            const modalContent = document.createElement('div');
+            modalContent.style.cssText = `
+                background: rgba(255, 255, 255, 0.95);
+                padding: 30px;
+                border-radius: 20px;
+                max-width: 400px;
+                width: 90%;
+                text-align: center;
+                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            `;
+            
+            modalContent.innerHTML = `
+                <h2 style="margin: 0 0 20px 0; color: #1d1d1f; font-size: 24px;">${house.name}</h2>
+                <p style="margin: 0 0 30px 0; color: #666; font-size: 16px;">
+                    Welcome to ${house.name}! What would you like to do?
+                </p>
+                <div class="house-actions-container" style="display: flex; flex-direction: column; gap: 15px;">
+                    ${this.getHouseActions(house)}
+                </div>
+                <button id="close-house-modal" style="
+                    position: absolute;
+                    top: 15px;
+                    right: 15px;
+                    background: none;
+                    border: none;
+                    font-size: 24px;
+                    cursor: pointer;
+                    color: #666;
+                ">×</button>
+            `;
+            
+            modal.appendChild(modalContent);
+            document.body.appendChild(modal);
+            
+            // Add event listeners
+            modal.querySelectorAll('.house-action-btn').forEach(btn => {
+                btn.style.cssText = `
+                    background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
+                    color: white;
+                    border: none;
+                    padding: 12px 20px;
+                    border-radius: 12px;
+                    font-size: 16px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                `;
+                
+                btn.addEventListener('click', (e) => {
+                    const action = e.target.getAttribute('data-action');
+                    this.handleHouseAction(action, house);
+                });
+                
+                btn.addEventListener('mouseenter', () => {
+                    btn.style.transform = 'translateY(-2px)';
+                    btn.style.boxShadow = '0 4px 15px rgba(0, 122, 255, 0.3)';
+                });
+                
+                btn.addEventListener('mouseleave', () => {
+                    btn.style.transform = 'translateY(0)';
+                    btn.style.boxShadow = 'none';
+                });
+            });
+            
+            document.getElementById('close-house-modal').addEventListener('click', () => {
+                modal.style.display = 'none';
+            });
+            
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.style.display = 'none';
+                }
+            });
+        }
+        
+        // Update house name in modal
+        modal.querySelector('h2').textContent = house.name;
+        modal.querySelector('p').textContent = `Welcome to ${house.name}! What would you like to do?`;
+        
+        modal.style.display = 'flex';
+    }
+    
+    getHouseActions(house) {
+        switch (house.type) {
+            case 'home':
+                return `
+                    <button class="house-action-btn" data-action="view-feedbacks">📝 View Feedbacks from Admins</button>
+                    <button class="house-action-btn" data-action="view-missions">📋 View Your Submitted Missions</button>
+                    <button class="house-action-btn" data-action="view-all">📊 View All Activity</button>
+                `;
+            case 'feedback':
+                return `
+                    <button class="house-action-btn" data-action="view-feedback">📝 View Feedback</button>
+                    <button class="house-action-btn" data-action="feedback-history">📊 Feedback History</button>
+                    <button class="house-action-btn" data-action="feedback-settings">⚙️ Feedback Settings</button>
+                `;
+            case 'missions':
+                return `
+                    <button class="house-action-btn" data-action="submit-mission">📋 Submit Daily Mission</button>
+                    <button class="house-action-btn" data-action="mission-status">📈 Mission Status</button>
+                    <button class="house-action-btn" data-action="mission-history">📚 Mission History</button>
+                `;
+            case 'history':
+                return `
+                    <button class="house-action-btn" data-action="view-history" disabled>📖 View History (Coming Soon)</button>
+                    <button class="house-action-btn" data-action="achievements" disabled>🏆 Achievements (Coming Soon)</button>
+                    <button class="house-action-btn" data-action="statistics" disabled>📊 Statistics (Coming Soon)</button>
+                `;
+            default:
+                return `
+                    <button class="house-action-btn" data-action="explore">🔍 Explore</button>
+                `;
+        }
+    }
+    
+    handleHouseAction(action, house) {
+        const modal = document.getElementById('house-modal');
+        modal.style.display = 'none';
+        
+        switch (house.type) {
+            case 'home':
+                this.handleHomeActions(action, house);
+                break;
+            case 'feedback':
+                this.handleFeedbackActions(action, house);
+                break;
+            case 'missions':
+                this.handleMissionActions(action, house);
+                break;
+            case 'history':
+                this.handleHistoryActions(action, house);
+                break;
+            default:
+                this.game.auth.showBottomNotification('🔍 Exploring...', 'info');
+        }
+    }
+    
+    handleHomeActions(action, house) {
+        switch (action) {
+            case 'view-feedbacks':
+                this.showHomeFeedbacksTable();
+                break;
+            case 'view-missions':
+                this.showHomeMissionsTable();
+                break;
+            case 'view-all':
+                this.showHomeOverviewTable();
+                break;
+        }
+    }
+    
+    handleFeedbackActions(action, house) {
+        switch (action) {
+            case 'view-feedback':
+                // Open the existing feedback modal
+                if (this.game.feedback) {
+                    this.game.feedback.showFeedbackModal();
+                } else {
+                    this.game.auth.showBottomNotification('📝 Opening feedback...', 'info');
+                }
+                break;
+            case 'feedback-history':
+                this.game.auth.showBottomNotification('📊 Feedback history coming soon!', 'info');
+                break;
+            case 'feedback-settings':
+                this.game.auth.showBottomNotification('⚙️ Feedback settings coming soon!', 'info');
+                break;
+        }
+    }
+    
+    handleMissionActions(action, house) {
+        switch (action) {
+            case 'submit-mission':
+                this.showMissionSubmissionModal();
+                break;
+            case 'mission-status':
+                this.game.auth.showBottomNotification('📈 Mission status coming soon!', 'info');
+                break;
+            case 'mission-history':
+                this.game.auth.showBottomNotification('📚 Mission history coming soon!', 'info');
+                break;
+        }
+    }
+    
+    handleHistoryActions(action, house) {
+        // All history actions are disabled for now
+        this.game.auth.showBottomNotification('📖 History features coming soon!', 'info');
+    }
+    
+    showMissionSubmissionModal() {
+        // Create mission submission modal
+        let modal = document.getElementById('mission-submission-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'mission-submission-modal';
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                display: none;
+                justify-content: center;
+                align-items: center;
+                z-index: 2000;
+                backdrop-filter: blur(5px);
+                -webkit-backdrop-filter: blur(5px);
+            `;
+            
+            const modalContent = document.createElement('div');
+            modalContent.style.cssText = `
+                background: rgba(255, 255, 255, 0.95);
+                padding: 30px;
+                border-radius: 20px;
+                max-width: 500px;
+                width: 90%;
+                text-align: center;
+                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            `;
+            
+            modalContent.innerHTML = `
+                <h2 style="margin: 0 0 20px 0; color: #1d1d1f; font-size: 24px;">📋 Submit Daily Mission</h2>
+                <p style="margin: 0 0 30px 0; color: #666; font-size: 16px;">
+                    Submit your completed daily mission for review.
+                </p>
+                <div style="display: flex; flex-direction: column; gap: 15px;">
+                    <button class="mission-action-btn" data-action="submit-photo">📸 Submit Photo Evidence</button>
+                    <button class="mission-action-btn" data-action="submit-text">📝 Submit Text Description</button>
+                    <button class="mission-action-btn" data-action="submit-link">🔗 Submit Link/URL</button>
+                </div>
+                <button id="close-mission-modal" style="
+                    position: absolute;
+                    top: 15px;
+                    right: 15px;
+                    background: none;
+                    border: none;
+                    font-size: 24px;
+                    cursor: pointer;
+                    color: #666;
+                ">×</button>
+            `;
+            
+            modal.appendChild(modalContent);
+            document.body.appendChild(modal);
+            
+            // Add event listeners
+            modal.querySelectorAll('.mission-action-btn').forEach(btn => {
+                btn.style.cssText = `
+                    background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
+                    color: white;
+                    border: none;
+                    padding: 12px 20px;
+                    border-radius: 12px;
+                    font-size: 16px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                `;
+                
+                btn.addEventListener('click', (e) => {
+                    const action = e.target.getAttribute('data-action');
+                    this.handleMissionSubmission(action);
+                });
+                
+                btn.addEventListener('mouseenter', () => {
+                    btn.style.transform = 'translateY(-2px)';
+                    btn.style.boxShadow = '0 4px 15px rgba(0, 122, 255, 0.3)';
+                });
+                
+                btn.addEventListener('mouseleave', () => {
+                    btn.style.transform = 'translateY(0)';
+                    btn.style.boxShadow = 'none';
+                });
+            });
+            
+            document.getElementById('close-mission-modal').addEventListener('click', () => {
+                modal.style.display = 'none';
+            });
+            
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.style.display = 'none';
+                }
+            });
+        }
+        
+        modal.style.display = 'flex';
+    }
+    
+    handleMissionSubmission(action) {
+        const modal = document.getElementById('mission-submission-modal');
+        modal.style.display = 'none';
+        
+        switch (action) {
+            case 'submit-photo':
+                this.showMissionInputModal('photo', '📸 Submit Photo Evidence');
+                break;
+            case 'submit-text':
+                this.showMissionInputModal('text', '📝 Submit Text Description');
+                break;
+            case 'submit-link':
+                this.showMissionInputModal('link', '🔗 Submit Link/URL');
+                break;
+        }
+    }
+    
+    showMissionInputModal(type, title) {
+        // Create mission input modal
+        let modal = document.getElementById('mission-input-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'mission-input-modal';
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                display: none;
+                justify-content: center;
+                align-items: center;
+                z-index: 2000;
+                backdrop-filter: blur(5px);
+                -webkit-backdrop-filter: blur(5px);
+            `;
+            
+            const modalContent = document.createElement('div');
+            modalContent.style.cssText = `
+                background: rgba(255, 255, 255, 0.95);
+                padding: 30px;
+                border-radius: 20px;
+                max-width: 500px;
+                width: 90%;
+                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            `;
+            
+            modalContent.innerHTML = `
+                <h2 class="mission-input-title" style="margin: 0 0 20px 0; color: #1d1d1f; font-size: 24px; text-align: center;"></h2>
+                <form id="mission-input-form">
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #333;">Mission Title:</label>
+                        <input type="text" id="mission-title" required style="
+                            width: 100%;
+                            padding: 12px;
+                            border: 2px solid rgba(0, 122, 255, 0.2);
+                            border-radius: 10px;
+                            font-size: 16px;
+                            transition: border-color 0.2s ease;
+                        " placeholder="Enter mission title...">
+                    </div>
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #333;">Description:</label>
+                        <textarea id="mission-description" required style="
+                            width: 100%;
+                            padding: 12px;
+                            border: 2px solid rgba(0, 122, 255, 0.2);
+                            border-radius: 10px;
+                            font-size: 16px;
+                            min-height: 100px;
+                            resize: vertical;
+                            transition: border-color 0.2s ease;
+                        " placeholder="Describe your mission..."></textarea>
+                    </div>
+                    <div class="mission-input-field" style="margin-bottom: 20px;">
+                        <!-- Dynamic input field will be inserted here -->
+                    </div>
+                    <div style="display: flex; gap: 15px; justify-content: center;">
+                        <button type="button" id="cancel-mission-input" style="
+                            background: rgba(255, 59, 48, 0.1);
+                            color: #ff3b30;
+                            border: 2px solid rgba(255, 59, 48, 0.3);
+                            padding: 12px 24px;
+                            border-radius: 12px;
+                            font-size: 14px;
+                            font-weight: 600;
+                            cursor: pointer;
+                            transition: all 0.2s ease;
+                        ">Cancel</button>
+                        <button type="submit" style="
+                            background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
+                            color: white;
+                            border: none;
+                            padding: 12px 24px;
+                            border-radius: 12px;
+                            font-size: 14px;
+                            font-weight: 600;
+                            cursor: pointer;
+                            transition: all 0.2s ease;
+                        ">Submit Mission</button>
+                    </div>
+                </form>
+                <button id="close-mission-input-modal" style="
+                    position: absolute;
+                    top: 15px;
+                    right: 15px;
+                    background: none;
+                    border: none;
+                    font-size: 24px;
+                    cursor: pointer;
+                    color: #666;
+                ">×</button>
+            `;
+            
+            modal.appendChild(modalContent);
+            document.body.appendChild(modal);
+            
+            // Add event listeners
+            document.getElementById('close-mission-input-modal').addEventListener('click', () => {
+                modal.style.display = 'none';
+            });
+            
+            document.getElementById('cancel-mission-input').addEventListener('click', () => {
+                modal.style.display = 'none';
+            });
+            
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.style.display = 'none';
+                }
+            });
+            
+            // Form submission
+            document.getElementById('mission-input-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.submitMission();
+            });
+        }
+        
+        // Update title and input field based on type
+        modal.querySelector('.mission-input-title').textContent = title;
+        const inputField = modal.querySelector('.mission-input-field');
+        
+        switch (type) {
+            case 'photo':
+                inputField.innerHTML = `
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #333;">Photo URL:</label>
+                    <input type="url" id="mission-content" required style="
+                        width: 100%;
+                        padding: 12px;
+                        border: 2px solid rgba(0, 122, 255, 0.2);
+                        border-radius: 10px;
+                        font-size: 16px;
+                        transition: border-color 0.2s ease;
+                    " placeholder="https://example.com/photo.jpg">
+                    <small style="color: #666; font-size: 12px; margin-top: 5px; display: block;">
+                        Enter the URL of your photo evidence
+                    </small>
+                `;
+                break;
+            case 'text':
+                inputField.innerHTML = `
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #333;">Text Evidence:</label>
+                    <textarea id="mission-content" required style="
+                        width: 100%;
+                        padding: 12px;
+                        border: 2px solid rgba(0, 122, 255, 0.2);
+                        border-radius: 10px;
+                        font-size: 16px;
+                        min-height: 80px;
+                        resize: vertical;
+                        transition: border-color 0.2s ease;
+                    " placeholder="Provide detailed text evidence..."></textarea>
+                `;
+                break;
+            case 'link':
+                inputField.innerHTML = `
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #333;">Link/URL:</label>
+                    <input type="url" id="mission-content" required style="
+                        width: 100%;
+                        padding: 12px;
+                        border: 2px solid rgba(0, 122, 255, 0.2);
+                        border-radius: 10px;
+                        font-size: 16px;
+                        transition: border-color 0.2s ease;
+                    " placeholder="https://example.com">
+                    <small style="color: #666; font-size: 12px; margin-top: 5px; display: block;">
+                        Enter the URL that supports your mission
+                    </small>
+                `;
+                break;
+        }
+        
+        modal.style.display = 'flex';
+    }
+    
+    async submitMission() {
+        if (!this.game.auth.user || !window.db) return;
+        
+        const title = document.getElementById('mission-title').value;
+        const description = document.getElementById('mission-description').value;
+        const content = document.getElementById('mission-content').value;
+        
+        if (!title || !description || !content) {
+            this.game.auth.showBottomNotification('❌ Please fill in all fields', 'error');
+            return;
+        }
+        
+        try {
+            // Determine mission type from the current modal
+            const modal = document.getElementById('mission-input-modal');
+            const titleText = modal.querySelector('.mission-input-title').textContent;
+            let type = 'text';
+            if (titleText.includes('Photo')) type = 'photo';
+            else if (titleText.includes('Link')) type = 'link';
+            
+            // Submit to playerMissions collection
+            const missionData = {
+                playerId: this.game.auth.user.uid,
+                playerName: this.game.auth.user.displayName || this.game.auth.user.email,
+                title: title,
+                description: description,
+                content: content,
+                type: type,
+                status: 'pending',
+                submittedAt: new Date().toISOString(),
+                createdAt: new Date().toISOString()
+            };
+            
+            await window.addDoc(window.collection(window.db, 'playerMissions'), missionData);
+            
+            // Close modal and show success
+            modal.style.display = 'none';
+            this.game.auth.showBottomNotification('✅ Mission submitted successfully!', 'success');
+            
+            // Clear form
+            document.getElementById('mission-input-form').reset();
+            
+        } catch (error) {
+            console.error('Error submitting mission:', error);
+            this.game.auth.showBottomNotification('❌ Failed to submit mission', 'error');
+        }
+    }
+    
+    showHomeFeedbacksTable() {
+        this.showHomeTable('feedbacks', 'Feedbacks from Admins', '📝');
+    }
+    
+    showHomeMissionsTable() {
+        this.showHomeTable('missions', 'Your Submitted Missions', '📋');
+    }
+    
+    showHomeOverviewTable() {
+        this.showHomeTable('all', 'All Activity', '📊');
+    }
+    
+    showHomeTable(type, title, icon) {
+        // Create home table modal
+        let modal = document.getElementById('home-table-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'home-table-modal';
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                display: none;
+                justify-content: center;
+                align-items: center;
+                z-index: 2000;
+                backdrop-filter: blur(5px);
+                -webkit-backdrop-filter: blur(5px);
+            `;
+            
+            const modalContent = document.createElement('div');
+            modalContent.style.cssText = `
+                background: rgba(255, 255, 255, 0.95);
+                padding: 20px;
+                border-radius: 20px;
+                max-width: 800px;
+                width: 95%;
+                max-height: 80vh;
+                overflow-y: auto;
+                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            `;
+            
+            modalContent.innerHTML = `
+                <div class="home-table-header" style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 20px;
+                    padding-bottom: 15px;
+                    border-bottom: 2px solid rgba(0, 122, 255, 0.2);
+                ">
+                    <h2 class="home-table-title" style="margin: 0; color: #1d1d1f; font-size: 24px; display: flex; align-items: center; gap: 10px;">
+                        <span class="table-icon">📊</span>
+                        <span class="table-title-text">Home Activity</span>
+                    </h2>
+                    <button id="close-home-table-modal" style="
+                        background: none;
+                        border: none;
+                        font-size: 24px;
+                        cursor: pointer;
+                        color: #666;
+                        padding: 5px;
+                        border-radius: 50%;
+                        transition: background 0.2s ease;
+                    ">×</button>
+                </div>
+                <div class="home-table-tabs" style="
+                    display: flex;
+                    gap: 10px;
+                    margin-bottom: 20px;
+                ">
+                    <button class="table-tab-btn active" data-tab="feedbacks" style="
+                        background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
+                        color: white;
+                        border: none;
+                        padding: 10px 20px;
+                        border-radius: 20px;
+                        font-size: 14px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                    ">📝 Feedbacks</button>
+                    <button class="table-tab-btn" data-tab="missions" style="
+                        background: rgba(0, 122, 255, 0.1);
+                        color: #007AFF;
+                        border: 2px solid rgba(0, 122, 255, 0.3);
+                        padding: 10px 20px;
+                        border-radius: 20px;
+                        font-size: 14px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                    ">📋 Missions</button>
+                    <button class="table-tab-btn" data-tab="all" style="
+                        background: rgba(0, 122, 255, 0.1);
+                        color: #007AFF;
+                        border: 2px solid rgba(0, 122, 255, 0.3);
+                        padding: 10px 20px;
+                        border-radius: 20px;
+                        font-size: 14px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                    ">📊 All</button>
+                </div>
+                <div class="home-table-content" style="
+                    min-height: 300px;
+                    max-height: 400px;
+                    overflow-y: auto;
+                ">
+                    <!-- Table content will be loaded here -->
+                </div>
+            `;
+            
+            modal.appendChild(modalContent);
+            document.body.appendChild(modal);
+            
+            // Add event listeners
+            document.getElementById('close-home-table-modal').addEventListener('click', () => {
+                modal.style.display = 'none';
+            });
+            
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.style.display = 'none';
+                }
+            });
+            
+            // Tab switching
+            modal.querySelectorAll('.table-tab-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    // Update active tab
+                    modal.querySelectorAll('.table-tab-btn').forEach(b => {
+                        b.style.background = 'rgba(0, 122, 255, 0.1)';
+                        b.style.color = '#007AFF';
+                        b.style.border = '2px solid rgba(0, 122, 255, 0.3)';
+                    });
+                    
+                    e.target.style.background = 'linear-gradient(135deg, #007AFF 0%, #0056CC 100%)';
+                    e.target.style.color = 'white';
+                    e.target.style.border = 'none';
+                    
+                    // Load content
+                    const tabType = e.target.getAttribute('data-tab');
+                    this.loadHomeTableContent(tabType);
+                });
+            });
+        }
+        
+        // Update title and load content
+        const titleElement = modal.querySelector('.table-title-text');
+        const iconElement = modal.querySelector('.table-icon');
+        titleElement.textContent = title;
+        iconElement.textContent = icon;
+        
+        // Set active tab
+        modal.querySelectorAll('.table-tab-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.getAttribute('data-tab') === type) {
+                btn.classList.add('active');
+                btn.style.background = 'linear-gradient(135deg, #007AFF 0%, #0056CC 100%)';
+                btn.style.color = 'white';
+                btn.style.border = 'none';
+            } else {
+                btn.style.background = 'rgba(0, 122, 255, 0.1)';
+                btn.style.color = '#007AFF';
+                btn.style.border = '2px solid rgba(0, 122, 255, 0.3)';
+            }
+        });
+        
+        // Load initial content
+        this.loadHomeTableContent(type);
+        
+        modal.style.display = 'flex';
+    }
+    
+    async loadHomeTableContent(type) {
+        const contentDiv = document.querySelector('.home-table-content');
+        if (!contentDiv) return;
+        
+        contentDiv.innerHTML = '<div style="text-align: center; padding: 40px; color: #666;">Loading...</div>';
+        
+        try {
+            let content = '';
+            
+            if (type === 'feedbacks' || type === 'all') {
+                const feedbacks = await this.loadPlayerFeedbacks();
+                content += this.renderFeedbacksTable(feedbacks);
+            }
+            
+            if (type === 'missions' || type === 'all') {
+                const missions = await this.loadPlayerMissions();
+                content += this.renderMissionsTable(missions);
+            }
+            
+            if (type === 'all') {
+                content = `<div style="display: flex; flex-direction: column; gap: 30px;">${content}</div>`;
+            }
+            
+            contentDiv.innerHTML = content || '<div style="text-align: center; padding: 40px; color: #666;">No data available</div>';
+            
+            // Add event listeners for read buttons
+            contentDiv.querySelectorAll('.mark-feedback-read-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const feedbackId = e.target.getAttribute('data-feedback-id');
+                    this.markFeedbackAsRead(feedbackId);
+                });
+                
+                // Add hover effects
+                btn.addEventListener('mouseenter', () => {
+                    btn.style.transform = 'scale(1.05)';
+                    btn.style.boxShadow = '0 4px 12px rgba(40, 167, 69, 0.3)';
+                });
+                
+                btn.addEventListener('mouseleave', () => {
+                    btn.style.transform = 'scale(1)';
+                    btn.style.boxShadow = 'none';
+                });
+            });
+            
+        } catch (error) {
+            console.error('Error loading home table content:', error);
+            contentDiv.innerHTML = '<div style="text-align: center; padding: 40px; color: #ff3b30;">Error loading data</div>';
+        }
+    }
+    
+    async loadPlayerFeedbacks() {
+        if (!this.game.auth.user || !window.db) return [];
+        
+        try {
+            // Get feedbacks from admin dashboard collection
+            const feedbacksRef = window.collection(window.db, 'adminFeedback');
+            const q = window.query(feedbacksRef, 
+                window.where('playerId', '==', this.game.auth.user.uid)
+            );
+            const querySnapshot = await window.getDocs(q);
+            
+            return querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+        } catch (error) {
+            console.error('Error loading player feedbacks:', error);
+            return [];
+        }
+    }
+    
+    async loadPlayerMissions() {
+        if (!this.game.auth.user || !window.db) return [];
+        
+        try {
+            // Get missions from playerMissions collection
+            const missionsRef = window.collection(window.db, 'playerMissions');
+            const q = window.query(missionsRef, 
+                window.where('playerId', '==', this.game.auth.user.uid)
+            );
+            const querySnapshot = await window.getDocs(q);
+            
+            return querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+        } catch (error) {
+            console.error('Error loading player missions:', error);
+            return [];
+        }
+    }
+    
+    renderFeedbacksTable(feedbacks) {
+        if (feedbacks.length === 0) {
+            return `
+                <div style="text-align: center; padding: 20px; color: #666;">
+                    <div style="font-size: 48px; margin-bottom: 10px;">📝</div>
+                    <div>No feedbacks received yet</div>
+                </div>
+            `;
+        }
+        
+        return `
+            <div style="margin-bottom: 20px;">
+                <h3 style="margin: 0 0 15px 0; color: #1d1d1f; font-size: 18px; display: flex; align-items: center; gap: 8px;">
+                    📝 Feedbacks from Admins (${feedbacks.length})
+                </h3>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    ${feedbacks.map(feedback => `
+                        <div style="
+                            background: rgba(255, 255, 255, 0.7);
+                            border: 1px solid rgba(0, 0, 0, 0.1);
+                            border-radius: 12px;
+                            padding: 15px;
+                            transition: all 0.2s ease;
+                        " onmouseover="this.style.background='rgba(0, 122, 255, 0.05)'" onmouseout="this.style.background='rgba(255, 255, 255, 0.7)'">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span style="font-size: 20px;">${feedback.type === 'positive' ? '✅' : '❌'}</span>
+                                    <strong style="color: ${feedback.type === 'positive' ? '#28a745' : '#dc3545'};">
+                                        ${feedback.type.toUpperCase()}
+                                    </strong>
+                                </div>
+                                <div style="font-size: 12px; color: #666;">
+                                    ${new Date(feedback.timestamp).toLocaleDateString()}
+                                </div>
+                            </div>
+                            <div style="margin-bottom: 10px;">
+                                <strong style="color: #333; font-size: 16px;">${feedback.title}</strong>
+                            </div>
+                            <div style="color: #555; font-size: 14px; line-height: 1.4; margin-bottom: 10px;">
+                                ${feedback.message}
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div style="font-size: 12px; color: #666;">
+                                    From: <strong>${feedback.sentByName || 'Admin'}</strong>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <div style="display: flex; align-items: center; gap: 5px; font-size: 12px; color: ${feedback.status === 'read' ? '#28a745' : '#ffc107'};">
+                                        ${feedback.status === 'read' ? '✅ Read' : '🔔 Unread'}
+                                    </div>
+                                    ${feedback.status === 'unread' ? `
+                                        <button class="mark-feedback-read-btn" data-feedback-id="${feedback.id}" style="
+                                            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+                                            color: white;
+                                            border: none;
+                                            padding: 6px 12px;
+                                            border-radius: 15px;
+                                            font-size: 11px;
+                                            font-weight: 600;
+                                            cursor: pointer;
+                                            transition: all 0.2s ease;
+                                        ">Read</button>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
+    renderMissionsTable(missions) {
+        if (missions.length === 0) {
+            return `
+                <div style="text-align: center; padding: 20px; color: #666;">
+                    <div style="font-size: 48px; margin-bottom: 10px;">📋</div>
+                    <div>No missions submitted yet</div>
+                </div>
+            `;
+        }
+        
+        return `
+            <div style="margin-bottom: 20px;">
+                <h3 style="margin: 0 0 15px 0; color: #1d1d1f; font-size: 18px; display: flex; align-items: center; gap: 8px;">
+                    📋 Your Submitted Missions (${missions.length})
+                </h3>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    ${missions.map(mission => `
+                        <div style="
+                            background: rgba(255, 255, 255, 0.7);
+                            border: 1px solid rgba(0, 0, 0, 0.1);
+                            border-radius: 12px;
+                            padding: 15px;
+                            transition: all 0.2s ease;
+                        " onmouseover="this.style.background='rgba(0, 122, 255, 0.05)'" onmouseout="this.style.background='rgba(255, 255, 255, 0.7)'">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span style="font-size: 20px;">${mission.type === 'photo' ? '📸' : mission.type === 'link' ? '🔗' : '📝'}</span>
+                                    <strong style="color: #333; font-size: 16px;">${mission.title}</strong>
+                                </div>
+                                <div style="
+                                    padding: 4px 12px;
+                                    border-radius: 20px;
+                                    font-size: 12px;
+                                    font-weight: 600;
+                                    color: white;
+                                    background: ${mission.status === 'approved' ? '#28a745' : mission.status === 'rejected' ? '#dc3545' : '#ffc107'};
+                                ">
+                                    ${mission.status === 'approved' ? '✅ Approved' : mission.status === 'rejected' ? '❌ Rejected' : '⏳ Pending'}
+                                </div>
+                            </div>
+                            <div style="color: #555; font-size: 14px; line-height: 1.4; margin-bottom: 10px;">
+                                ${mission.description}
+                            </div>
+                            <div style="margin-bottom: 10px;">
+                                <div style="font-size: 12px; color: #666; margin-bottom: 5px;">
+                                    <strong>Evidence (${mission.type}):</strong>
+                                </div>
+                                <div style="
+                                    background: rgba(0, 0, 0, 0.05);
+                                    padding: 8px;
+                                    border-radius: 6px;
+                                    font-size: 12px;
+                                    color: #333;
+                                    word-break: break-all;
+                                ">
+                                    ${mission.content}
+                                </div>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #666;">
+                                <div>Type: <strong>${mission.type.toUpperCase()}</strong></div>
+                                <div>Submitted: ${new Date(mission.submittedAt).toLocaleDateString()}</div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
+    setupNotificationSystem() {
+        // Create notification container
+        this.notificationContainer = document.createElement('div');
+        this.notificationContainer.id = 'feedback-notification-container';
+        this.notificationContainer.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 3000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        `;
+        document.body.appendChild(this.notificationContainer);
+        
+        // Check for new feedback every 5 seconds
+        setInterval(() => {
+            this.checkForNewFeedback();
+        }, 5000);
+        
+        // Initial check
+        this.checkForNewFeedback();
+    }
+    
+    async checkForNewFeedback() {
+        if (!this.game.auth.user || !window.db) return;
+        
+        try {
+            // Check adminFeedback collection for unread feedbacks
+            const feedbacksRef = window.collection(window.db, 'adminFeedback');
+            const q = window.query(feedbacksRef, 
+                window.where('playerId', '==', this.game.auth.user.uid),
+                window.where('status', '==', 'unread')
+            );
+            const querySnapshot = await window.getDocs(q);
+            const unreadCount = querySnapshot.docs.length;
+            
+            // Show notification if there are new unread feedbacks
+            if (unreadCount > this.lastFeedbackCount && this.lastFeedbackCount > 0) {
+                const newCount = unreadCount - this.lastFeedbackCount;
+                this.showFeedbackNotification(newCount);
+            }
+            
+            this.lastFeedbackCount = unreadCount;
+        } catch (error) {
+            console.error('Error checking for new feedback:', error);
+        }
+    }
+    
+    async markFeedbackAsRead(feedbackId) {
+        if (!this.game.auth.user || !window.db) return;
+        
+        try {
+            // Update feedback status in adminFeedback collection
+            const feedbackRef = window.doc(window.db, 'adminFeedback', feedbackId);
+            await window.updateDoc(feedbackRef, {
+                status: 'read',
+                readAt: new Date().toISOString()
+            });
+            
+            // Show success notification
+            this.game.auth.showBottomNotification('✅ Feedback marked as read', 'success');
+            
+            // Refresh the table content
+            const modal = document.getElementById('home-table-modal');
+            if (modal && modal.style.display !== 'none') {
+                const activeTab = modal.querySelector('.table-tab-btn.active');
+                if (activeTab) {
+                    const tabType = activeTab.getAttribute('data-tab');
+                    this.loadHomeTableContent(tabType);
+                }
+            }
+            
+        } catch (error) {
+            console.error('Error marking feedback as read:', error);
+            this.game.auth.showBottomNotification('❌ Failed to mark feedback as read', 'error');
+        }
+    }
+    
+    showFeedbackNotification(count) {
+        const notification = document.createElement('div');
+        notification.className = 'feedback-notification';
+        notification.style.cssText = `
+            background: linear-gradient(135deg, #ff3b30 0%, #d70015 100%);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(255, 59, 48, 0.3);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transform: translateX(100%);
+            transition: all 0.3s ease;
+            pointer-events: auto;
+            cursor: pointer;
+            max-width: 300px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        `;
+        
+        notification.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="
+                    background: rgba(255, 255, 255, 0.2);
+                    border-radius: 50%;
+                    width: 40px;
+                    height: 40px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 20px;
+                ">📝</div>
+                <div>
+                    <div style="font-weight: 600; font-size: 16px; margin-bottom: 2px;">
+                        New Feedback!
+                    </div>
+                    <div style="font-size: 14px; opacity: 0.9;">
+                        You have ${count} new feedback${count > 1 ? 's' : ''} from admin${count > 1 ? 's' : ''}
+                    </div>
+                </div>
+                <button class="notification-close" style="
+                    background: none;
+                    border: none;
+                    color: white;
+                    font-size: 18px;
+                    cursor: pointer;
+                    padding: 5px;
+                    border-radius: 50%;
+                    transition: background 0.2s ease;
+                    margin-left: auto;
+                ">×</button>
+            </div>
+        `;
+        
+        // Add event listeners
+        notification.addEventListener('click', () => {
+            this.hideNotification(notification);
+            // Open home table with feedbacks
+            this.showHomeFeedbacksTable();
+        });
+        
+        notification.querySelector('.notification-close').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.hideNotification(notification);
+        });
+        
+        // Add hover effects
+        notification.addEventListener('mouseenter', () => {
+            notification.style.transform = 'translateX(0) scale(1.02)';
+            notification.style.boxShadow = '0 12px 30px rgba(255, 59, 48, 0.4)';
+        });
+        
+        notification.addEventListener('mouseleave', () => {
+            notification.style.transform = 'translateX(0) scale(1)';
+            notification.style.boxShadow = '0 8px 25px rgba(255, 59, 48, 0.3)';
+        });
+        
+        this.notificationContainer.appendChild(notification);
+        
+        // Animate in
+        setTimeout(() => {
+            notification.style.transform = 'translateX(0)';
+        }, 100);
+        
+        // Auto-hide after 8 seconds
+        setTimeout(() => {
+            this.hideNotification(notification);
+        }, 8000);
+    }
+    
+    hideNotification(notification) {
+        if (!notification || !notification.parentNode) return;
+        
+        notification.style.transform = 'translateX(100%)';
+        notification.style.opacity = '0';
+        
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 300);
     }
 }
 
