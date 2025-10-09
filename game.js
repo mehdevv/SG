@@ -712,6 +712,11 @@ class Player {
         this.isMoving = input.x !== 0 || input.y !== 0;
         
         if (this.isMoving) {
+            // Close quest panel when player starts moving
+            if (this.game.ui && this.game.ui.elements.questPanel && this.game.ui.elements.questPanel.classList.contains('open')) {
+                this.game.ui.closeQuestPanel();
+            }
+            
             // Update direction
             if (Math.abs(input.x) > Math.abs(input.y)) {
                 this.direction = input.x > 0 ? 'right' : 'left';
@@ -1049,23 +1054,29 @@ class UIManager {
                 <span class="reward-badge reward-coins">+${quest.coinsReward || 0} DZD</span>
             </div>
             <div class="quest-actions">
-                ${quest.verificationLink ? `
-                    <button class="verification-btn" data-verification-link="${quest.verificationLink}">
-                        ${quest.verificationName || 'Verify Quest'}
-                    </button>
-                ` : ''}
-                ${isCompleted ? `
-                    <button class="done-btn completed" disabled>
-                        ✅ Completed
-                    </button>
-                ` : isPlayerDone ? `
-                    <button class="done-btn waiting-approval" disabled>
-                        ⏳ Waiting for Approval
+                ${isExpired ? `
+                    <button class="justify-btn" data-quest-id="${quest.id}">
+                        📝 Justify Non-Completion
                     </button>
                 ` : `
-                    <button class="done-btn" data-quest-id="${quest.id}" ${isExpired ? 'disabled' : ''}>
-                        Done
-                    </button>
+                    ${quest.verificationLink ? `
+                        <button class="verification-btn" data-verification-link="${quest.verificationLink}">
+                            ${quest.verificationName || 'Verify Quest'}
+                        </button>
+                    ` : ''}
+                    ${isCompleted ? `
+                        <button class="done-btn completed" disabled>
+                            ✅ Completed
+                        </button>
+                    ` : isPlayerDone ? `
+                        <button class="done-btn waiting-approval" disabled>
+                            ⏳ Waiting for Approval
+                        </button>
+                    ` : `
+                        <button class="done-btn" data-quest-id="${quest.id}">
+                            Done
+                        </button>
+                    `}
                 `}
             </div>
         `;
@@ -1078,6 +1089,9 @@ class UIManager {
             } else if (e.target.classList.contains('done-btn') && !e.target.disabled) {
                 const questId = e.target.getAttribute('data-quest-id');
                 if (questId) this.handleQuestDone(questId);
+            } else if (e.target.classList.contains('justify-btn')) {
+                const questId = e.target.getAttribute('data-quest-id');
+                if (questId) this.showQuestJustificationModal(questId);
             }
         });
         
@@ -1093,7 +1107,7 @@ class UIManager {
         // Update timers every 2 seconds to reduce lag
         this.questTimerInterval = setInterval(() => {
             this.updateQuestTimers();
-        }, 2000);
+        }, 10000);
     }
     
     updateQuestTimers() {
@@ -1166,9 +1180,346 @@ class UIManager {
     }
     
     handleQuestDone(questId) {
-        // Delegate to the auth manager
-        if (this.game.auth && this.game.auth.handleQuestDone) {
-            this.game.auth.handleQuestDone(questId);
+        // Show confirmation dialog
+        const confirmed = confirm('Are you sure you want to mark this quest as done?');
+        
+        if (confirmed) {
+            // Delegate to the auth manager
+            if (this.game.auth && this.game.auth.handleQuestDone) {
+                this.game.auth.handleQuestDone(questId);
+            }
+        }
+    }
+    
+    showQuestJustificationModal(questId) {
+        // Find the quest data
+        const questItem = document.querySelector(`[data-quest-id="${questId}"]`);
+        if (!questItem) return;
+        
+        const questTitle = questItem.querySelector('.quest-title').textContent;
+        const questDescription = questItem.querySelector('.quest-description').textContent;
+        
+        // Create modal overlay
+        const modal = document.createElement('div');
+        modal.className = 'quest-justification-modal';
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+        `;
+        
+        // Create modal content
+        const modalContent = document.createElement('div');
+        modalContent.style.cssText = `
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        `;
+        
+        modalContent.innerHTML = `
+            <div style="font-size: 48px; margin-bottom: 20px;">📝</div>
+            <h3 style="margin: 0 0 15px 0; color: #333; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                Quest Justification
+            </h3>
+            <div style="margin-bottom: 20px; padding: 15px; background: rgba(0, 0, 0, 0.05); border-radius: 10px; text-align: left;">
+                <h4 style="margin: 0 0 10px 0; color: #666; font-size: 14px;">Quest:</h4>
+                <p style="margin: 0; color: #333; font-weight: 600;">${questTitle}</p>
+                <p style="margin: 10px 0 0 0; color: #666; font-size: 14px;">${questDescription}</p>
+            </div>
+            <p style="margin: 0 0 20px 0; color: #666; font-size: 14px;">
+                Please explain why you were unable to complete this quest. Your explanation will be sent to the admin for review.
+            </p>
+            <div style="position: relative; margin-bottom: 20px;">
+                <textarea id="justificationText" placeholder="Enter your justification here..." style="
+                    width: 100%;
+                    height: 120px;
+                    padding: 15px;
+                    border: 2px solid rgba(0, 0, 0, 0.1);
+                    border-radius: 12px;
+                    font-size: 14px;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    resize: vertical;
+                    box-sizing: border-box;
+                    -webkit-user-select: text;
+                    -moz-user-select: text;
+                    -ms-user-select: text;
+                    user-select: text;
+                    pointer-events: auto;
+                    touch-action: manipulation;
+                    background: white;
+                    outline: none;
+                    position: relative;
+                    z-index: 10001;
+                    -webkit-appearance: none;
+                    -moz-appearance: none;
+                    appearance: none;
+                    display: block;
+                    overflow: auto;
+                "></textarea>
+                <div style="
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    pointer-events: none;
+                    z-index: -1;
+                    background: transparent;
+                "></div>
+            </div>
+            <div style="display: flex; gap: 15px; justify-content: center;">
+                <button id="justify-cancel" style="
+                    background: rgba(255, 59, 48, 0.1);
+                    color: #ff3b30;
+                    border: 2px solid rgba(255, 59, 48, 0.3);
+                    padding: 12px 24px;
+                    border-radius: 12px;
+                    font-size: 14px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                ">Cancel</button>
+                <button id="justify-submit" style="
+                    background: rgba(52, 199, 89, 0.9);
+                    color: white;
+                    border: 2px solid rgba(52, 199, 89, 0.3);
+                    padding: 12px 24px;
+                    border-radius: 12px;
+                    font-size: 14px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                ">Submit Justification</button>
+            </div>
+        `;
+        
+        modal.appendChild(modalContent);
+        document.body.appendChild(modal);
+        
+        // Prevent modal from closing when clicking on content
+        modalContent.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+        
+        // Only close modal when clicking the background
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                document.body.removeChild(modal);
+            }
+        });
+        
+        // Prevent textarea click from closing modal and ensure it's focusable
+        const textarea = modalContent.querySelector('#justificationText');
+        textarea.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+        
+        // Add additional event listeners to ensure textarea works
+        textarea.addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+        });
+        
+        textarea.addEventListener('touchend', (e) => {
+            e.stopPropagation();
+        });
+        
+        textarea.addEventListener('input', (e) => {
+            e.stopPropagation();
+        });
+        
+        textarea.addEventListener('keydown', (e) => {
+            e.stopPropagation();
+        });
+        
+        textarea.addEventListener('keyup', (e) => {
+            e.stopPropagation();
+        });
+        
+        // Add hover effects
+        const cancelBtn = modalContent.querySelector('#justify-cancel');
+        const submitBtn = modalContent.querySelector('#justify-submit');
+        
+        cancelBtn.addEventListener('mouseenter', () => {
+            cancelBtn.style.background = 'rgba(255, 59, 48, 0.2)';
+            cancelBtn.style.borderColor = 'rgba(255, 59, 48, 0.5)';
+        });
+        cancelBtn.addEventListener('mouseleave', () => {
+            cancelBtn.style.background = 'rgba(255, 59, 48, 0.1)';
+            cancelBtn.style.borderColor = 'rgba(255, 59, 48, 0.3)';
+        });
+        
+        submitBtn.addEventListener('mouseenter', () => {
+            submitBtn.style.background = 'rgba(52, 199, 89, 1)';
+            submitBtn.style.borderColor = 'rgba(52, 199, 89, 0.5)';
+        });
+        submitBtn.addEventListener('mouseleave', () => {
+            submitBtn.style.background = 'rgba(52, 199, 89, 0.9)';
+            submitBtn.style.borderColor = 'rgba(52, 199, 89, 0.3)';
+        });
+        
+        // Handle button clicks
+        cancelBtn.addEventListener('click', () => {
+            document.body.removeChild(modal);
+        });
+        
+        submitBtn.addEventListener('click', () => {
+            let justificationText = modalContent.querySelector('#justificationText').value.trim();
+            
+            // Fallback: if textarea is empty, try prompt
+            if (!justificationText) {
+                justificationText = prompt('Please enter your justification for not completing this quest:');
+                if (!justificationText || justificationText.trim() === '') {
+                    this.game.auth.showBottomNotification('❌ Please enter a justification', 'error');
+                    return;
+                }
+            }
+            
+            // Submit the justification
+            this.submitQuestJustification(questId, questTitle, justificationText);
+            document.body.removeChild(modal);
+        });
+        
+        // Handle escape key
+        const handleEscape = (e) => {
+            if (e.key === 'Escape') {
+                document.body.removeChild(modal);
+                document.removeEventListener('keydown', handleEscape);
+            }
+        };
+        document.addEventListener('keydown', handleEscape);
+        
+        // Focus on textarea and ensure it's ready for input
+        setTimeout(() => {
+            const textarea = modalContent.querySelector('#justificationText');
+            textarea.focus();
+            textarea.click(); // Ensure it's properly activated
+            
+            // Force focus on mobile devices
+            if (textarea.setSelectionRange) {
+                textarea.setSelectionRange(0, 0);
+            }
+            
+            // Additional mobile focus handling
+            textarea.addEventListener('focus', () => {
+                console.log('Textarea focused');
+            });
+            
+            textarea.addEventListener('blur', () => {
+                console.log('Textarea blurred');
+            });
+        }, 300);
+    }
+    
+    async submitQuestJustification(questId, questTitle, justificationText) {
+        try {
+            // Show loading notification
+            this.game.auth.showBottomNotification('📤 Submitting justification...', 'info');
+            
+            // Create justification data
+            const justification = {
+                id: Date.now().toString(),
+                questId: questId,
+                questName: questTitle,
+                playerId: this.game.auth.user?.uid || this.game.auth.user?.email,
+                playerName: this.game.auth.user?.displayName || this.game.auth.user?.email || 'Unknown Player',
+                message: justificationText,
+                timestamp: new Date().toISOString(),
+                status: 'unread'
+            };
+            
+            // Save to Firebase
+            await this.saveQuestJustificationToFirebase(justification);
+            
+            // Show success notification
+            this.game.auth.showBottomNotification('✅ Justification submitted successfully!', 'success');
+            
+            // Update the quest button to show it was justified
+            this.updateQuestJustificationStatus(questId);
+            
+        } catch (error) {
+            console.error('❌ Error submitting quest justification:', error);
+            this.game.auth.showBottomNotification('❌ Failed to submit justification', 'error');
+        }
+    }
+    
+    async saveQuestJustificationToFirebase(justification) {
+        if (!window.db) {
+            throw new Error('Firebase not initialized');
+        }
+        
+        try {
+            // Save to admin_messages collection
+            const messageRef = window.doc(window.db, 'admin_messages', justification.id);
+            await window.setDoc(messageRef, justification);
+            
+            // Also update the quest document with the justification
+            await this.updateQuestWithJustification(justification);
+            
+            console.log('✅ Quest justification saved to Firebase:', justification);
+        } catch (error) {
+            console.error('❌ Error saving quest justification to Firebase:', error);
+            throw error;
+        }
+    }
+    
+    async updateQuestWithJustification(justification) {
+        try {
+            // Update the quest document with the justification
+            const questRef = window.doc(window.db, 'quests', justification.questId);
+            await window.updateDoc(questRef, {
+                playerJustification: {
+                    message: justification.message,
+                    playerId: justification.playerId,
+                    playerName: justification.playerName,
+                    timestamp: justification.timestamp,
+                    status: 'pending_review'
+                },
+                lastUpdated: new Date().toISOString()
+            });
+            
+            console.log('✅ Quest updated with player justification');
+        } catch (error) {
+            console.error('❌ Error updating quest with justification:', error);
+            // Don't throw error here - the message was already saved to admin_messages
+        }
+    }
+    
+    updateQuestJustificationStatus(questId) {
+        // Find the quest item and update the button
+        const questItem = document.querySelector(`[data-quest-id="${questId}"]`);
+        if (questItem) {
+            const justifyBtn = questItem.querySelector('.justify-btn');
+            if (justifyBtn) {
+                justifyBtn.textContent = '✅ Justification Sent';
+                justifyBtn.disabled = true;
+                justifyBtn.style.opacity = '0.7';
+                justifyBtn.style.cursor = 'not-allowed';
+                justifyBtn.style.background = 'rgba(52, 199, 89, 0.6)';
+                justifyBtn.style.borderColor = 'rgba(52, 199, 89, 0.3)';
+                justifyBtn.style.color = 'white';
+                
+                // Remove click event listener to prevent any interaction
+                justifyBtn.onclick = null;
+                justifyBtn.removeEventListener('click', this.showQuestJustificationModal);
+            }
         }
     }
     
@@ -2206,7 +2557,6 @@ class AuthManager {
                     
                     if (isRecent && isForCurrentUser) {
                         console.log('📡 Received localStorage stat update:', { playerId, stats });
-                        this.handleExternalStatUpdate(stats);
                         
                         // Clear the update to prevent duplicate processing
                         localStorage.removeItem('playerStatUpdate');
@@ -2218,7 +2568,7 @@ class AuthManager {
         };
         
         // Check for updates every 2 seconds
-        setInterval(checkForStatUpdates, 2000);
+        setInterval(checkForStatUpdates, 10000);
         
         // Also check immediately
         checkForStatUpdates();
@@ -2282,7 +2632,7 @@ class AuthManager {
         };
         
         // Check for quest updates every 3 seconds
-        setInterval(checkForQuestUpdates, 3000);
+        setInterval(checkForQuestUpdates, 10000);
         
         // Also check immediately
         checkForQuestUpdates();
@@ -2313,6 +2663,37 @@ class AuthManager {
             
         } catch (error) {
             console.error("❌ Debug error:", error);
+        }
+    }
+    
+    // Handle quest completion by player
+    async handleQuestDone(questId) {
+        if (!this.user || !window.db) {
+            console.error('❌ User not authenticated or database not available');
+            this.showBottomNotification('❌ Error: Not authenticated', 'error');
+            return;
+        }
+        
+        try {
+            console.log('🎯 Player marking quest as done:', questId);
+            
+            // Update quest status to 'player_done' in Firebase
+            const questRef = window.doc(window.db, 'quests', questId);
+            await window.updateDoc(questRef, {
+                status: 'player_done',
+                playerDoneBy: this.user.uid,
+                playerDoneAt: new Date().toISOString()
+            });
+            
+            console.log('✅ Quest marked as done by player');
+            this.showBottomNotification('✅ Quest submitted for approval!', 'success');
+            
+            // Reload player quests to show updated status
+            await this.loadPlayerQuests();
+            
+        } catch (error) {
+            console.error('❌ Error marking quest as done:', error);
+            this.showBottomNotification('❌ Failed to submit quest', 'error');
         }
     }
 }
@@ -3897,7 +4278,7 @@ class HouseInteractionManager {
         // Check for new feedback every 5 seconds
         setInterval(() => {
             this.checkForNewFeedback();
-        }, 5000);
+        }, 10000);
         
         // Initial check
         this.checkForNewFeedback();
