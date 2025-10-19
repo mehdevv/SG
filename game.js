@@ -12,6 +12,7 @@ class AdventureGame {
         this.lastTime = 0;
         this.deltaTime = 0;
         this.statsRefreshTimer = 0;
+        this.debugMode = false; // Debug mode for collision visualization
         
         // Initialize canvas
         this.setupCanvas();
@@ -313,7 +314,14 @@ class InputManager {
     
     handleKeyDown(e) {
         this.keys[e.key.toLowerCase()] = true;
-            e.preventDefault();
+        
+        // Toggle debug mode with 'D' key
+        if (e.key.toLowerCase() === 'd') {
+            this.game.debugMode = !this.game.debugMode;
+            console.log(`🐛 Debug mode: ${this.game.debugMode ? 'ON' : 'OFF'}`);
+        }
+        
+        e.preventDefault();
     }
     
     handleKeyUp(e) {
@@ -507,14 +515,19 @@ class MapManager {
         this.collisionLayer = null;
         this.width = 0;
         this.height = 0;
-        this.tileSize = 32;
+        this.tileWidth = 32;
+        this.tileHeight = 32;
+        
+        // Spatial partitioning for performance
+        this.spatialGrid = new Map();
+        this.gridSize = 100; // Grid cell size
     }
     
     async loadAssets() {
         console.log('🗺️ Loading map assets...');
         
         // Load world map image
-        this.worldMap = await this.loadImage('worldmap.png');
+        this.worldMap = await this.loadImage('realisticmap.png');
         
         // Load collision data
         await this.loadCollisionData();
@@ -533,7 +546,8 @@ class MapManager {
     
     async loadCollisionData() {
         try {
-            const response = await fetch('walls.tmj');
+            // Load collision data from wallspro.tmj
+            const response = await fetch('wallspro.tmj');
             const data = await response.json();
             
             this.collisionLayer = [];
@@ -541,45 +555,116 @@ class MapManager {
             if (data && data.layers) {
                 const wallsLayer = data.layers.find(layer => layer.name === 'walls');
                 if (wallsLayer && wallsLayer.objects) {
-                    this.collisionLayer = wallsLayer.objects.map(obj => ({
-                        x: obj.x,
-                        y: obj.y,
-                        width: obj.width,
-                        height: obj.height
-                    }));
+                    this.collisionLayer = wallsLayer.objects.map(obj => {
+                        const shape = this.detectShapeType(obj);
+                        return {
+                            x: obj.x,
+                            y: obj.y,
+                            width: obj.width,
+                            height: obj.height,
+                            rotation: obj.rotation || 0,
+                            shape: shape,
+                            polygon: obj.polygon || null,
+                            radius: obj.radius || (shape === 'circle' ? Math.min(obj.width, obj.height) / 2 : null),
+                            points: obj.points || null,
+                            type: obj.type || 'collision'
+                        };
+                    });
                 }
             }
             
-            this.width = data.width || 0;
-            this.height = data.height || 0;
-            this.tileSize = data.tilewidth || 32;
+            // Set realistic map dimensions based on wallspro.tmj
+            // Map is 1x1 tile with 1037x1613 pixel dimensions
+            this.width = data.width || 1; // Single tile width
+            this.height = data.height || 1; // Single tile height
+            this.tileWidth = data.tilewidth || 1037; // Original tile width
+            this.tileHeight = data.tileheight || 1613; // Original tile height
             
-            // Set camera bounds
-            const mapWidth = this.width * this.tileSize;
-            const mapHeight = this.height * this.tileSize;
+            // Set camera bounds to match the realistic map's original ratio
+            const mapWidth = this.width * this.tileWidth;
+            const mapHeight = this.height * this.tileHeight;
             this.game.camera.setBounds(0, 0, mapWidth, mapHeight);
             
-            console.log(`📐 Map: ${this.width}x${this.height} tiles, ${mapWidth}x${mapHeight} pixels`);
-            console.log(`🧱 Collision objects: ${this.collisionLayer.length}`);
+            // Update spatial grid for performance
+            this.updateSpatialGrid();
+            
+            console.log(`📐 Realistic Map: ${this.width}x${this.height} tiles, ${mapWidth}x${mapHeight} pixels`);
+            console.log(`🧱 Collision objects: ${this.collisionLayer.length} loaded from wallspro.tmj`);
+            console.log(`🎯 Advanced collision system with shape detection enabled`);
+            
+            // Debug: Count shapes by type
+            const shapeCounts = {};
+            for (const obj of this.collisionLayer) {
+                shapeCounts[obj.shape] = (shapeCounts[obj.shape] || 0) + 1;
+            }
+            console.log(`📊 Shape distribution:`, shapeCounts);
+            
+            // Debug: Show polygon details
+            const polygons = this.collisionLayer.filter(obj => obj.shape === 'polygon');
+            if (polygons.length > 0) {
+                console.log(`🔺 Found ${polygons.length} polygon(s):`);
+                polygons.forEach((poly, index) => {
+                    console.log(`  Polygon ${index + 1}: ${poly.polygon.length} vertices at (${poly.x}, ${poly.y})`);
+                    console.log(`    Vertices:`, poly.polygon);
+                });
+            }
             
         } catch (error) {
             console.error('❌ Failed to load collision data:', error);
+            // Fallback to no collision if loading fails
+            this.collisionLayer = [];
+            this.width = 1;
+            this.height = 1;
+            this.tileWidth = 1037;
+            this.tileHeight = 1613;
         }
     }
     
     checkCollision(x, y, width, height) {
         // Check map boundaries
-        const mapWidth = this.width * this.tileSize;
-        const mapHeight = this.height * this.tileSize;
+        const mapWidth = this.width * this.tileWidth;
+        const mapHeight = this.height * this.tileHeight;
         
         if (x < 0 || y < 0 || x + width > mapWidth || y + height > mapHeight) {
             return true;
         }
         
-        // Check collision objects
-        for (const wall of this.collisionLayer) {
-            if (this.rectCollision(x, y, width, height, wall.x, wall.y, wall.width, wall.height)) {
-                return true;
+        // Get relevant grid cells for performance optimization
+        const minGridX = Math.floor(x / this.gridSize);
+        const maxGridX = Math.floor((x + width) / this.gridSize);
+        const minGridY = Math.floor(y / this.gridSize);
+        const maxGridY = Math.floor((y + height) / this.gridSize);
+        
+        // Debug logging
+        if (this.game.debugMode) {
+            console.log(`🔍 Checking collision at (${x}, ${y}) size (${width}, ${height})`);
+            console.log(`📊 Grid cells: (${minGridX},${minGridY}) to (${maxGridX},${maxGridY})`);
+        }
+        
+        // Check collision only with objects in relevant cells
+        for (let gridX = minGridX; gridX <= maxGridX; gridX++) {
+            for (let gridY = minGridY; gridY <= maxGridY; gridY++) {
+                const key = `${gridX},${gridY}`;
+                const cellObjects = this.spatialGrid.get(key) || [];
+                
+                if (this.game.debugMode && cellObjects.length > 0) {
+                    console.log(`🎯 Grid cell (${gridX},${gridY}) has ${cellObjects.length} objects`);
+                }
+                
+                for (const objIndex of cellObjects) {
+                    const wall = this.collisionLayer[objIndex];
+                    
+                    if (this.game.debugMode) {
+                        console.log(`🧱 Checking ${wall.shape} object at (${wall.x}, ${wall.y})`);
+                    }
+                    
+                    if (this.checkShapeCollision(x, y, width, height, wall)) {
+                        if (this.game.debugMode) {
+                            console.log(`🚫 COLLISION DETECTED with ${wall.shape} object!`);
+                        }
+                        return true;
+                    }
+                }
             }
         }
         
@@ -590,14 +675,375 @@ class MapManager {
         return x1 < x2 + w2 && x1 + w1 > x2 && y1 < y2 + h2 && y1 + h1 > y2;
     }
     
+    // Auto-detect shape type from object properties
+    detectShapeType(obj) {
+        // Check for polygon data first
+        if (obj.polygon && Array.isArray(obj.polygon) && obj.polygon.length >= 3) {
+            console.log(`🔍 Detected polygon object with ${obj.polygon.length} vertices:`, obj.polygon);
+            if (obj.polygon.length === 3) {
+                return 'triangle';
+            }
+            return 'polygon';
+        }
+        
+        // Check for circle (radius or equal width/height)
+        if (obj.radius || (obj.width === obj.height && obj.width > 0)) {
+            return 'circle';
+        }
+        
+        // Check for rotated rectangle
+        if (obj.rotation && obj.rotation !== 0) {
+            return 'rectangle'; // Will be handled as rotated rectangle
+        }
+        
+        // Default to rectangle
+        return 'rectangle';
+    }
+    
+    // Update spatial grid for performance optimization
+    updateSpatialGrid() {
+        this.spatialGrid.clear();
+        
+        for (let i = 0; i < this.collisionLayer.length; i++) {
+            const wall = this.collisionLayer[i];
+            
+            // Calculate bounding box for different shape types
+            let minX, minY, maxX, maxY;
+            
+            if (wall.shape === 'polygon' && wall.polygon && wall.polygon.length > 0) {
+                // Calculate bounding box for polygon
+                const worldPoints = wall.polygon.map(point => ({
+                    x: wall.x + point.x,
+                    y: wall.y + point.y
+                }));
+                
+                minX = Math.min(...worldPoints.map(p => p.x));
+                minY = Math.min(...worldPoints.map(p => p.y));
+                maxX = Math.max(...worldPoints.map(p => p.x));
+                maxY = Math.max(...worldPoints.map(p => p.y));
+            } else {
+                // Use standard bounding box for other shapes
+                minX = wall.x;
+                minY = wall.y;
+                maxX = wall.x + wall.width;
+                maxY = wall.y + wall.height;
+            }
+            
+            // Add object to all grid cells it overlaps
+            const minGridX = Math.floor(minX / this.gridSize);
+            const maxGridX = Math.floor(maxX / this.gridSize);
+            const minGridY = Math.floor(minY / this.gridSize);
+            const maxGridY = Math.floor(maxY / this.gridSize);
+            
+            for (let gridX = minGridX; gridX <= maxGridX; gridX++) {
+                for (let gridY = minGridY; gridY <= maxGridY; gridY++) {
+                    const key = `${gridX},${gridY}`;
+                    
+                    if (!this.spatialGrid.has(key)) {
+                        this.spatialGrid.set(key, []);
+                    }
+                    this.spatialGrid.get(key).push(i);
+                }
+            }
+        }
+        
+        console.log(`🗺️ Spatial grid updated with ${this.collisionLayer.length} objects`);
+    }
+    
+    // Shape-specific collision detection
+    checkShapeCollision(playerX, playerY, playerWidth, playerHeight, wall) {
+        switch (wall.shape) {
+            case 'circle':
+                return this.checkCircleCollision(playerX, playerY, playerWidth, playerHeight, wall);
+            case 'triangle':
+                return this.checkTriangleCollision(playerX, playerY, playerWidth, playerHeight, wall);
+            case 'polygon':
+                return this.checkPolygonCollision(playerX, playerY, playerWidth, playerHeight, wall);
+            case 'rectangle':
+            default:
+                return this.checkRotatedRectangleCollision(playerX, playerY, playerWidth, playerHeight, wall);
+        }
+    }
+    
+    // Circle collision detection
+    checkCircleCollision(playerX, playerY, playerWidth, playerHeight, circle) {
+        // Get circle center and radius
+        const circleCenterX = circle.x + (circle.radius || circle.width / 2);
+        const circleCenterY = circle.y + (circle.radius || circle.height / 2);
+        const radius = circle.radius || Math.min(circle.width, circle.height) / 2;
+        
+        // Get player center
+        const playerCenterX = playerX + playerWidth / 2;
+        const playerCenterY = playerY + playerHeight / 2;
+        
+        // Calculate distance between centers
+        const dx = playerCenterX - circleCenterX;
+        const dy = playerCenterY - circleCenterY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        // Check if distance is less than radius + player radius
+        const playerRadius = Math.min(playerWidth, playerHeight) / 2;
+        return distance < (radius + playerRadius);
+    }
+    
+    // Triangle collision detection
+    checkTriangleCollision(playerX, playerY, playerWidth, playerHeight, triangle) {
+        // Define triangle points (assuming equilateral triangle)
+        const points = triangle.points || [
+            { x: triangle.x + triangle.width / 2, y: triangle.y }, // Top
+            { x: triangle.x, y: triangle.y + triangle.height }, // Bottom left
+            { x: triangle.x + triangle.width, y: triangle.y + triangle.height } // Bottom right
+        ];
+        
+        // Check if any corner of player rectangle is inside triangle
+        const playerCorners = [
+            { x: playerX, y: playerY },
+            { x: playerX + playerWidth, y: playerY },
+            { x: playerX, y: playerY + playerHeight },
+            { x: playerX + playerWidth, y: playerY + playerHeight }
+        ];
+        
+        for (const corner of playerCorners) {
+            if (this.pointInTriangle(corner, points[0], points[1], points[2])) {
+                return true;
+            }
+        }
+        
+        // Check if any triangle point is inside player rectangle
+        for (const point of points) {
+            if (point.x >= playerX && point.x <= playerX + playerWidth &&
+                point.y >= playerY && point.y <= playerY + playerHeight) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    // Helper function to check if point is inside triangle
+    pointInTriangle(point, a, b, c) {
+        const denom = (b.y - c.y) * (a.x - c.x) + (c.x - b.x) * (a.y - c.y);
+        const alpha = ((b.y - c.y) * (point.x - c.x) + (c.x - b.x) * (point.y - c.y)) / denom;
+        const beta = ((c.y - a.y) * (point.x - c.x) + (a.x - c.x) * (point.y - c.y)) / denom;
+        const gamma = 1 - alpha - beta;
+        
+        return alpha >= 0 && beta >= 0 && gamma >= 0;
+    }
+    
+    // Rotated rectangle collision detection
+    checkRotatedRectangleCollision(playerX, playerY, playerWidth, playerHeight, wall) {
+        if (wall.rotation === 0) {
+            // Use simple rectangle collision for non-rotated rectangles
+            return this.rectCollision(playerX, playerY, playerWidth, playerHeight, 
+                                     wall.x, wall.y, wall.width, wall.height);
+        }
+        
+        // For rotated rectangles, use Separating Axis Theorem (SAT)
+        const playerCorners = this.getRotatedCorners(playerX, playerY, playerWidth, playerHeight, 0);
+        const wallCorners = this.getRotatedCorners(wall.x, wall.y, wall.width, wall.height, wall.rotation);
+        
+        return this.satCollision(playerCorners, wallCorners);
+    }
+    
+    // Get corners of rotated rectangle
+    getRotatedCorners(x, y, width, height, rotation) {
+        const rad = (rotation * Math.PI) / 180;
+        const cos = Math.cos(rad);
+        const sin = Math.sin(rad);
+        
+        const corners = [
+            { x: 0, y: 0 },
+            { x: width, y: 0 },
+            { x: width, y: height },
+            { x: 0, y: height }
+        ];
+        
+        return corners.map(corner => ({
+            x: x + corner.x * cos - corner.y * sin,
+            y: y + corner.x * sin + corner.y * cos
+        }));
+    }
+    
+    // Separating Axis Theorem collision detection
+    satCollision(shape1, shape2) {
+        const shapes = [shape1, shape2];
+        
+        for (let shape = 0; shape < 2; shape++) {
+            const currentShape = shapes[shape];
+            const otherShape = shapes[1 - shape];
+            
+            for (let i = 0; i < currentShape.length; i++) {
+                const p1 = currentShape[i];
+                const p2 = currentShape[(i + 1) % currentShape.length];
+                
+                const axis = { x: p2.y - p1.y, y: p1.x - p2.x };
+                const length = Math.sqrt(axis.x * axis.x + axis.y * axis.y);
+                axis.x /= length;
+                axis.y /= length;
+                
+                const projection1 = this.projectShape(currentShape, axis);
+                const projection2 = this.projectShape(otherShape, axis);
+                
+                if (!this.overlap(projection1, projection2)) {
+                    return false;
+                }
+            }
+        }
+        
+        return true;
+    }
+    
+    // Project shape onto axis
+    projectShape(shape, axis) {
+        let min = Infinity;
+        let max = -Infinity;
+        
+        for (const point of shape) {
+            const dot = point.x * axis.x + point.y * axis.y;
+            min = Math.min(min, dot);
+            max = Math.max(max, dot);
+        }
+        
+        return { min, max };
+    }
+    
+    // Check if two projections overlap
+    overlap(proj1, proj2) {
+        return proj1.max >= proj2.min && proj2.max >= proj1.min;
+    }
+    
+    // Enhanced polygon collision detection
+    checkPolygonCollision(playerX, playerY, playerWidth, playerHeight, polygon) {
+        if (!polygon.polygon || !Array.isArray(polygon.polygon) || polygon.polygon.length < 3) {
+            console.log('⚠️ Invalid polygon data:', polygon);
+            return false;
+        }
+        
+        // Convert polygon points to world coordinates
+        const worldPoints = polygon.polygon.map(point => ({
+            x: polygon.x + point.x,
+            y: polygon.y + point.y
+        }));
+        
+        if (this.game.debugMode) {
+            console.log(`🎯 Checking polygon collision with ${worldPoints.length} vertices:`, worldPoints);
+            console.log(`👤 Player at (${playerX}, ${playerY}) size (${playerWidth}, ${playerHeight})`);
+        }
+        
+        // Check if any player corner is inside polygon
+        const playerCorners = [
+            { x: playerX, y: playerY },
+            { x: playerX + playerWidth, y: playerY },
+            { x: playerX, y: playerY + playerHeight },
+            { x: playerX + playerWidth, y: playerY + playerHeight }
+        ];
+        
+        for (const corner of playerCorners) {
+            if (this.pointInPolygon(corner, worldPoints)) {
+                if (this.game.debugMode) {
+                    console.log(`🚫 Player corner collision detected at (${corner.x}, ${corner.y})`);
+                }
+                return true;
+            }
+        }
+        
+        // Check if any polygon point is inside player rectangle
+        for (const point of worldPoints) {
+            if (point.x >= playerX && point.x <= playerX + playerWidth &&
+                point.y >= playerY && point.y <= playerY + playerHeight) {
+                if (this.game.debugMode) {
+                    console.log(`🚫 Polygon point collision detected at (${point.x}, ${point.y})`);
+                }
+                return true;
+            }
+        }
+        
+        // Check for edge intersections between player rectangle and polygon
+        if (this.rectanglePolygonIntersection(playerX, playerY, playerWidth, playerHeight, worldPoints)) {
+            if (this.game.debugMode) {
+                console.log(`🚫 Rectangle-polygon edge intersection detected`);
+            }
+            return true;
+        }
+        
+        if (this.game.debugMode) {
+            console.log(`✅ No polygon collision detected`);
+        }
+        
+        return false;
+    }
+    
+    // Check for intersections between rectangle edges and polygon edges
+    rectanglePolygonIntersection(rectX, rectY, rectWidth, rectHeight, polygonPoints) {
+        const rectEdges = [
+            // Top edge
+            { x1: rectX, y1: rectY, x2: rectX + rectWidth, y2: rectY },
+            // Right edge
+            { x1: rectX + rectWidth, y1: rectY, x2: rectX + rectWidth, y2: rectY + rectHeight },
+            // Bottom edge
+            { x1: rectX, y1: rectY + rectHeight, x2: rectX + rectWidth, y2: rectY + rectHeight },
+            // Left edge
+            { x1: rectX, y1: rectY, x2: rectX, y2: rectY + rectHeight }
+        ];
+        
+        // Check each rectangle edge against each polygon edge
+        for (let i = 0; i < polygonPoints.length; i++) {
+            const p1 = polygonPoints[i];
+            const p2 = polygonPoints[(i + 1) % polygonPoints.length];
+            
+            for (const rectEdge of rectEdges) {
+                if (this.lineIntersection(
+                    rectEdge.x1, rectEdge.y1, rectEdge.x2, rectEdge.y2,
+                    p1.x, p1.y, p2.x, p2.y
+                )) {
+                    return true;
+                }
+            }
+        }
+        
+        return false;
+    }
+    
+    // Check if two line segments intersect
+    lineIntersection(x1, y1, x2, y2, x3, y3, x4, y4) {
+        const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+        if (Math.abs(denom) < 1e-10) return false; // Lines are parallel
+        
+        const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
+        const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom;
+        
+        return t >= 0 && t <= 1 && u >= 0 && u <= 1;
+    }
+    
+    // Point in polygon test using ray casting
+    pointInPolygon(point, polygon) {
+        let inside = false;
+        
+        for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+            if (((polygon[i].y > point.y) !== (polygon[j].y > point.y)) &&
+                (point.x < (polygon[j].x - polygon[i].x) * (point.y - polygon[i].y) / (polygon[j].y - polygon[i].y) + polygon[i].x)) {
+                inside = !inside;
+            }
+        }
+        
+        return inside;
+    }
+    
     render(ctx) {
         if (!this.worldMap) return;
         
-        // Render world map at correct size
-        const mapWidth = this.width * this.tileSize;
-        const mapHeight = this.height * this.tileSize;
+        // Render world map at correct size using original dimensions
+        const mapWidth = this.width * this.tileWidth;
+        const mapHeight = this.height * this.tileHeight;
         
         ctx.drawImage(this.worldMap, 0, 0, mapWidth, mapHeight);
+        
+        // Render collision debug visualization (optional - can be toggled)
+        if (this.game.debugMode) {
+            this.renderCollisionDebug(ctx);
+            // Also render house areas for debugging
+            this.renderHouseAreasDebug(ctx);
+        }
         
         // Render home alert if there's unread feedback
         if (this.hasUnreadFeedback) {
@@ -605,10 +1051,110 @@ class MapManager {
         }
     }
     
+    // Debug visualization for collision shapes
+    renderCollisionDebug(ctx) {
+        ctx.save();
+        
+        for (const wall of this.collisionLayer) {
+            ctx.strokeStyle = '#ff0000';
+            ctx.lineWidth = 2;
+            ctx.globalAlpha = 0.7;
+            
+            switch (wall.shape) {
+                case 'polygon':
+                    this.renderPolygonDebug(ctx, wall);
+                    break;
+                case 'triangle':
+                    this.renderTriangleDebug(ctx, wall);
+                    break;
+                case 'circle':
+                    this.renderCircleDebug(ctx, wall);
+                    break;
+                case 'rectangle':
+                    this.renderRectangleDebug(ctx, wall);
+                    break;
+            }
+        }
+        
+        ctx.restore();
+    }
+    
+    // Render polygon debug visualization
+    renderPolygonDebug(ctx, polygon) {
+        if (!polygon.polygon || polygon.polygon.length < 3) return;
+        
+        const worldPoints = polygon.polygon.map(point => ({
+            x: polygon.x + point.x,
+            y: polygon.y + point.y
+        }));
+        
+        ctx.beginPath();
+        ctx.moveTo(worldPoints[0].x, worldPoints[0].y);
+        
+        for (let i = 1; i < worldPoints.length; i++) {
+            ctx.lineTo(worldPoints[i].x, worldPoints[i].y);
+        }
+        
+        ctx.closePath();
+        ctx.stroke();
+        
+        // Fill with semi-transparent color
+        ctx.fillStyle = 'rgba(255, 0, 0, 0.2)';
+        ctx.fill();
+        
+        // Draw vertices
+        ctx.fillStyle = '#ff0000';
+        for (const point of worldPoints) {
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, 3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+    
+    // Render triangle debug visualization
+    renderTriangleDebug(ctx, triangle) {
+        const points = triangle.points || [
+            { x: triangle.x + triangle.width / 2, y: triangle.y },
+            { x: triangle.x, y: triangle.y + triangle.height },
+            { x: triangle.x + triangle.width, y: triangle.y + triangle.height }
+        ];
+        
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        ctx.lineTo(points[1].x, points[1].y);
+        ctx.lineTo(points[2].x, points[2].y);
+        ctx.closePath();
+        ctx.stroke();
+        
+        ctx.fillStyle = 'rgba(255, 0, 0, 0.2)';
+        ctx.fill();
+    }
+    
+    // Render circle debug visualization
+    renderCircleDebug(ctx, circle) {
+        const centerX = circle.x + (circle.radius || circle.width / 2);
+        const centerY = circle.y + (circle.radius || circle.height / 2);
+        const radius = circle.radius || Math.min(circle.width, circle.height) / 2;
+        
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        ctx.fillStyle = 'rgba(255, 0, 0, 0.2)';
+        ctx.fill();
+    }
+    
+    // Render rectangle debug visualization
+    renderRectangleDebug(ctx, rectangle) {
+        ctx.strokeRect(rectangle.x, rectangle.y, rectangle.width, rectangle.height);
+        ctx.fillStyle = 'rgba(255, 0, 0, 0.2)';
+        ctx.fillRect(rectangle.x, rectangle.y, rectangle.width, rectangle.height);
+    }
+    
     renderHomeAlert(ctx) {
-        const homeX = 100; // Home position X
-        const homeY = 100; // Home position Y
-        const alertRadius = 30;
+        const homeX = 300; // Home position X (adjusted for 1037x1613 map)
+        const homeY = 400; // Home position Y (adjusted for 1037x1613 map)
+        const alertRadius = 60; // Scaled up for larger map
         const time = Date.now() * 0.003; // Animation time
         
         // Save context state
@@ -649,6 +1195,81 @@ class MapManager {
         // Restore context state
         ctx.restore();
     }
+    
+    // Debug visualization for house areas
+    renderHouseAreasDebug(ctx) {
+        if (!this.game.houseInteraction || !this.game.houseInteraction.houseAreas) return;
+        
+        ctx.save();
+        
+        for (const house of this.game.houseInteraction.houseAreas) {
+            ctx.strokeStyle = '#00ff00'; // Green for house areas
+            ctx.lineWidth = 3;
+            ctx.globalAlpha = 0.7;
+            
+            switch (house.shape) {
+                case 'polygon':
+                    this.renderHousePolygonDebug(ctx, house);
+                    break;
+                case 'ellipse':
+                    this.renderHouseEllipseDebug(ctx, house);
+                    break;
+                case 'rectangle':
+                    this.renderHouseRectangleDebug(ctx, house);
+                    break;
+            }
+            
+            // Draw house name
+            ctx.fillStyle = '#00ff00';
+            ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(house.name, house.centerX, house.centerY - 20);
+        }
+        
+        ctx.restore();
+    }
+    
+    renderHousePolygonDebug(ctx, house) {
+        if (!house.polygon || house.polygon.length < 3) return;
+        
+        const worldPoints = house.polygon.map(point => ({
+            x: house.x + point.x,
+            y: house.y + point.y
+        }));
+        
+        ctx.beginPath();
+        ctx.moveTo(worldPoints[0].x, worldPoints[0].y);
+        
+        for (let i = 1; i < worldPoints.length; i++) {
+            ctx.lineTo(worldPoints[i].x, worldPoints[i].y);
+        }
+        
+        ctx.closePath();
+        ctx.stroke();
+        
+        // Fill with semi-transparent color
+        ctx.fillStyle = 'rgba(0, 255, 0, 0.2)';
+        ctx.fill();
+    }
+    
+    renderHouseEllipseDebug(ctx, house) {
+        const centerX = house.x + house.width / 2;
+        const centerY = house.y + house.height / 2;
+        
+        ctx.beginPath();
+        ctx.ellipse(centerX, centerY, house.width / 2, house.height / 2, 0, 0, 2 * Math.PI);
+        ctx.stroke();
+        
+        ctx.fillStyle = 'rgba(0, 255, 0, 0.2)';
+        ctx.fill();
+    }
+    
+    renderHouseRectangleDebug(ctx, house) {
+        ctx.strokeRect(house.x, house.y, house.width, house.height);
+        ctx.fillStyle = 'rgba(0, 255, 0, 0.2)';
+        ctx.fillRect(house.x, house.y, house.width, house.height);
+    }
 }
 
 /**
@@ -657,11 +1278,11 @@ class MapManager {
 class Player {
     constructor(game) {
         this.game = game;
-        this.x = 30;
-        this.y = 550;
-        this.width = 24;
-        this.height = 31.2;
-        this.speed = 120; // pixels per second
+        this.x = 500; // Adjusted for realistic map (1037x1613)
+        this.y = 800; // Adjusted for realistic map (1037x1613)
+        this.width = 36; // 1.5x bigger (was 24)
+        this.height = 46.8; // 1.5x bigger (was 31.2)
+        this.speed = 240; // Increased speed for larger map
         this.direction = 'down';
         this.isMoving = false;
         
@@ -830,6 +1451,7 @@ class UIManager {
             userLevel: document.getElementById('userLevel'),
             userPoints: document.getElementById('userPoints'),
             userExp: document.getElementById('userExp'),
+            userExpMax: document.getElementById('userExpMax'),
             playerAvatar: document.getElementById('playerAvatar'),
             questToggle: document.getElementById('questToggle'),
             questPanel: document.getElementById('questPanel')
@@ -910,16 +1532,7 @@ class UIManager {
         // Store previous values for comparison
         const previousStats = this.lastStats || {};
         
-        // Update username - always use the actual name from Firebase
-        if (this.elements.userName) {
-            const newName = stats.name || 'Player';
-            if (this.elements.userName.textContent !== newName) {
-                this.elements.userName.textContent = newName;
-                this.highlightStatChange('userName');
-            }
-        }
-        
-        // Update level
+        // Update level (CoC-style HUD)
         if (this.elements.userLevel) {
             if (this.elements.userLevel.textContent !== stats.level.toString()) {
                 this.elements.userLevel.textContent = stats.level;
@@ -927,7 +1540,7 @@ class UIManager {
             }
         }
         
-        // Update points (DZD)
+        // Update points/coins (CoC-style HUD)
         if (this.elements.userPoints) {
             if (this.elements.userPoints.textContent !== stats.points.toString()) {
                 this.elements.userPoints.textContent = stats.points;
@@ -935,18 +1548,35 @@ class UIManager {
             }
         }
         
-        // Update experience
-        if (this.elements.userExp) {
-            let newExpText;
+        // Update experience and XP bar (CoC-style HUD)
+        if (this.elements.userExp && this.elements.userExpMax) {
+            let currentExp, maxExp, expPercentage;
+            
             if (stats.level >= 10) {
-                newExpText = 'MAX';
+                currentExp = 'MAX';
+                maxExp = 'MAX';
+                expPercentage = 100;
             } else {
-                const expNeeded = stats.level * 100; // Level 1: 100, Level 2: 200, etc.
-                newExpText = `${stats.experience}/${expNeeded}`;
+                maxExp = stats.level * 100; // Level 1: 100, Level 2: 200, etc.
+                currentExp = stats.experience;
+                expPercentage = Math.min((stats.experience / maxExp) * 100, 100);
             }
-            if (this.elements.userExp.textContent !== newExpText) {
-                this.elements.userExp.textContent = newExpText;
+            
+            // Update current XP text
+            if (this.elements.userExp.textContent !== currentExp.toString()) {
+                this.elements.userExp.textContent = currentExp;
                 this.highlightStatChange('userExp');
+            }
+            
+            // Update max XP text
+            if (this.elements.userExpMax.textContent !== maxExp.toString()) {
+                this.elements.userExpMax.textContent = maxExp;
+            }
+            
+            // Update XP bar fill
+            const xpBarFill = document.getElementById('xpBarFill');
+            if (xpBarFill) {
+                xpBarFill.style.width = `${expPercentage}%`;
             }
         }
         
@@ -1054,7 +1684,7 @@ class UIManager {
                 <span class="reward-badge reward-coins">+${quest.coinsReward || 0} DZD</span>
             </div>
             <div class="quest-actions">
-                ${isExpired ? `
+                ${isExpired && !isPlayerDone && !isCompleted ? `
                     <button class="justify-btn" data-quest-id="${quest.id}">
                         📝 Justify Non-Completion
                     </button>
@@ -3086,71 +3716,214 @@ class HouseInteractionManager {
         this.checkInterval = 100; // Check every 100ms instead of every frame
         this.notificationContainer = null;
         this.lastFeedbackCount = 0;
+        this.houseButtonConfig = {}; // Store CSV button configuration
         this.loadHouseAreas();
+        this.loadHouseButtonConfig();
         this.setupNotificationSystem();
     }
     
     loadHouseAreas() {
-        // Load house interaction areas from the layers of houses.tmj file
-        fetch('layers of houses.tmj')
+        // Load house interaction areas from houses.tmj file
+        fetch('houses.tmj')
             .then(response => response.json())
             .then(data => {
                 this.houseAreas = [];
-                data.layers.forEach(layer => {
-                    if (layer.name.startsWith('H') && layer.objects && layer.objects.length > 0) {
+                console.log('🏠 Loading house areas from houses.tmj...');
+                
+                // Process each layer (1-8) according to house placements
+                data.layers.forEach((layer, layerIndex) => {
+                    const layerNumber = layerIndex + 1; // Layers are 1-indexed
+                    
+                    if (layer.objects && layer.objects.length > 0) {
                         layer.objects.forEach((obj, index) => {
-                            if (obj.ellipse) {
-                                // Calculate center of ellipse
-                                const centerX = obj.x + (obj.width / 2);
-                                const centerY = obj.y + (obj.height / 2);
-                                const radius = Math.max(obj.width, obj.height) / 2;
-                                
-                                // Map house layers to specific names and types
-                                let houseName, houseType;
-                                switch (layer.name) {
-                                    case 'H1':
-                                        houseName = 'Home';
-                                        houseType = 'home';
-                                        break;
-                                    case 'H2':
-                                        houseName = 'Feedback Center';
-                                        houseType = 'feedback';
-                                        break;
-                                    case 'H3':
-                                        houseName = 'Mission Station';
-                                        houseType = 'missions';
-                                        break;
-                                    case 'H4':
-                                        houseName = 'History Archive';
-                                        houseType = 'history';
-                                        break;
-                                    default:
-                                        houseName = layer.name;
-                                        houseType = 'general';
-                                }
-                                
-                                this.houseAreas.push({
-                                    id: `${layer.name}_${index}`,
-                                    name: houseName,
-                                    type: houseType,
-                                    layerName: layer.name,
-                                    centerX,
-                                    centerY,
-                                    radius,
-                                    width: obj.width,
-                                    height: obj.height,
-                                    x: obj.x,
-                                    y: obj.y
-                                });
+                            // Calculate interaction area bounds
+                            const centerX = obj.x + (obj.width / 2);
+                            const centerY = obj.y + (obj.height / 2);
+                            const radius = Math.max(obj.width, obj.height) / 2;
+                            
+                            // Map house layers to specific names and types based on placements
+                            let houseName, houseType, houseDescription;
+                            switch (layerNumber) {
+                                case 1: // Castle (Top Middle)
+                                    houseName = 'Castle';
+                                    houseType = 'castle';
+                                    houseDescription = 'The royal castle at the top of the realm';
+                                    break;
+                                case 2: // House (Top Left)
+                                    houseName = 'Top Left House';
+                                    houseType = 'house';
+                                    houseDescription = 'A cozy house in the top left area';
+                                    break;
+                                case 3: // House (Middle)
+                                    houseName = 'Central House';
+                                    houseType = 'house';
+                                    houseDescription = 'The main house in the center';
+                                    break;
+                                case 4: // House (Top Right)
+                                    houseName = 'Top Right House';
+                                    houseType = 'house';
+                                    houseDescription = 'A house in the top right area';
+                                    break;
+                                case 5: // House (Middle Right)
+                                    houseName = 'Middle Right House';
+                                    houseType = 'house';
+                                    houseDescription = 'A house in the middle right area';
+                                    break;
+                                case 6: // House (Bottom Left)
+                                    houseName = 'Bottom Left House';
+                                    houseType = 'house';
+                                    houseDescription = 'A house in the bottom left area';
+                                    break;
+                                case 7: // House (Bottom Middle)
+                                    houseName = 'Bottom Middle House';
+                                    houseType = 'house';
+                                    houseDescription = 'A house in the bottom center';
+                                    break;
+                                case 8: // House (Bottom Right)
+                                    houseName = 'Bottom Right House';
+                                    houseType = 'house';
+                                    houseDescription = 'A house in the bottom right area';
+                                    break;
+                                default:
+                                    houseName = `House ${layerNumber}`;
+                                    houseType = 'house';
+                                    houseDescription = `A house in layer ${layerNumber}`;
                             }
+                            
+                            // Store polygon data for precise collision detection
+                            const houseData = {
+                                id: `house_${layerNumber}_${index}`,
+                                name: houseName,
+                                type: houseType,
+                                description: houseDescription,
+                                layerNumber: layerNumber,
+                                x: obj.x,
+                                y: obj.y,
+                                width: obj.width,
+                                height: obj.height,
+                                centerX: centerX,
+                                centerY: centerY,
+                                radius: radius, // Keep for fallback
+                                bounds: {
+                                    minX: obj.x,
+                                    minY: obj.y,
+                                    maxX: obj.x + obj.width,
+                                    maxY: obj.y + obj.height
+                                }
+                            };
+
+                            // Add polygon data if available
+                            if (obj.polygon && Array.isArray(obj.polygon) && obj.polygon.length >= 3) {
+                                houseData.polygon = obj.polygon;
+                                houseData.shape = 'polygon';
+                                console.log(`🔺 House ${houseName} has polygon with ${obj.polygon.length} vertices`);
+                            } else if (obj.ellipse) {
+                                houseData.shape = 'ellipse';
+                                houseData.ellipse = true;
+                                console.log(`⭕ House ${houseName} is an ellipse`);
+                            } else {
+                                houseData.shape = 'rectangle';
+                                console.log(`⬜ House ${houseName} is a rectangle`);
+                            }
+
+                            this.houseAreas.push(houseData);
                         });
                     }
                 });
-                console.log('🏠 Loaded house interaction areas:', this.houseAreas);
+                
+                console.log(`✅ Loaded ${this.houseAreas.length} house areas:`, this.houseAreas);
+                
+                // Debug: Log each house's details
+                this.houseAreas.forEach((house, index) => {
+                    console.log(`🏠 House ${index + 1}: ${house.name} at (${house.x}, ${house.y}) with radius ${house.radius}`);
+                });
+                
+                this.createInteractionButton();
             })
             .catch(error => {
-                console.error('Error loading house areas:', error);
+                console.error('❌ Failed to load house areas:', error);
+                this.houseAreas = [];
             });
+    }
+    
+    async loadHouseButtonConfig() {
+        try {
+            console.log('📊 Loading house button configuration from CSV...');
+            const response = await fetch('Bouton.csv');
+            const csvText = await response.text();
+            
+            this.houseButtonConfig = this.parseCSV(csvText);
+            console.log('✅ House button configuration loaded:', this.houseButtonConfig);
+        } catch (error) {
+            console.error('❌ Failed to load house button config:', error);
+            this.houseButtonConfig = this.getDefaultHouseConfig();
+        }
+    }
+    
+    parseCSV(csvText) {
+        const lines = csvText.split('\n');
+        const config = {};
+        
+        // Skip header lines and process data
+        for (let i = 2; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+            
+            const columns = line.split('|');
+            if (columns.length < 6) continue;
+            
+            const buttonName = columns[0].trim();
+            const input1 = columns[1].trim();
+            const input2 = columns[2].trim();
+            const input3 = columns[3].trim();
+            const input4 = columns[4].trim();
+            const houseNumber = columns[5].trim();
+            
+            // Skip empty rows or rows without house number
+            if (!houseNumber || !buttonName) continue;
+            
+            // Initialize house config if not exists
+            if (!config[houseNumber]) {
+                config[houseNumber] = {
+                    name: this.getHouseName(houseNumber),
+                    buttons: []
+                };
+            }
+            
+            // Add button configuration
+            const inputs = [input1, input2, input3, input4].filter(input => input);
+            config[houseNumber].buttons.push({
+                name: buttonName,
+                inputs: inputs
+            });
+        }
+        
+        return config;
+    }
+    
+    getHouseName(houseNumber) {
+        const houseNames = {
+            '1': 'Castle',
+            '2': 'Pointage System',
+            '3': 'Ideas & Improvement',
+            '5': 'Tasks & Reading',
+            '6': 'Seminar Management',
+            '7': 'Mission Management',
+            '8': 'Photo & Video Training'
+        };
+        return houseNames[houseNumber] || `House ${houseNumber}`;
+    }
+    
+    getDefaultHouseConfig() {
+        return {
+            '1': {
+                name: 'Castle',
+                buttons: [
+                    { name: 'Royal Audience', inputs: [] },
+                    { name: 'Castle Tour', inputs: [] }
+                ]
+            }
+        };
     }
     
     createInteractionButton() {
@@ -3206,24 +3979,52 @@ class HouseInteractionManager {
     }
     
     checkProximityToHouses() {
-        if (!this.game.player || this.houseAreas.length === 0) return;
+        if (!this.game.player || this.houseAreas.length === 0) {
+            if (this.houseAreas.length === 0) {
+                console.log('🏠 No house areas loaded yet');
+            }
+            return;
+        }
         
         const playerX = this.game.player.x;
         const playerY = this.game.player.y;
+        const playerWidth = this.game.player.width;
+        const playerHeight = this.game.player.height;
         let nearestHouse = null;
-        let minDistance = Infinity;
         
-        // Find the nearest house
+        // Check each house using the same collision detection system as walls
         for (const house of this.houseAreas) {
-            const distance = Math.sqrt(
-                Math.pow(playerX - house.centerX, 2) + 
-                Math.pow(playerY - house.centerY, 2)
-            );
+            let isInside = false;
             
-            if (distance <= house.radius && distance < minDistance) {
-                minDistance = distance;
-                nearestHouse = house;
+            // Use the same collision detection methods as the wall system
+            switch (house.shape) {
+                case 'polygon':
+                    isInside = this.checkHousePolygonCollision(playerX, playerY, playerWidth, playerHeight, house);
+                    break;
+                case 'ellipse':
+                    isInside = this.checkHouseEllipseCollision(playerX, playerY, playerWidth, playerHeight, house);
+                    break;
+                case 'rectangle':
+                    isInside = this.checkHouseRectangleCollision(playerX, playerY, playerWidth, playerHeight, house);
+                    break;
+                default:
+                    // Fallback to simple distance check
+                    const distance = Math.sqrt(
+                        Math.pow(playerX - house.centerX, 2) + 
+                        Math.pow(playerY - house.centerY, 2)
+                    );
+                    isInside = distance <= house.radius;
             }
+            
+            if (isInside) {
+                nearestHouse = house;
+                break; // Use first house found (can be modified for priority)
+            }
+        }
+        
+        // Debug logging
+        if (nearestHouse) {
+            console.log(`🏠 Player inside ${nearestHouse.name} (${nearestHouse.shape})`);
         }
         
         // Show/hide interaction button
@@ -3236,39 +4037,125 @@ class HouseInteractionManager {
         }
     }
     
+    // House collision detection methods (reusing wall collision logic)
+    checkHousePolygonCollision(playerX, playerY, playerWidth, playerHeight, house) {
+        if (!house.polygon || !Array.isArray(house.polygon) || house.polygon.length < 3) {
+            return false;
+        }
+        
+        const worldPoints = house.polygon.map(point => ({
+            x: house.x + point.x,
+            y: house.y + point.y
+        }));
+        
+        // Check if any player corner is inside the polygon
+        const playerCorners = [
+            { x: playerX, y: playerY },
+            { x: playerX + playerWidth, y: playerY },
+            { x: playerX, y: playerY + playerHeight },
+            { x: playerX + playerWidth, y: playerY + playerHeight }
+        ];
+        
+        for (const corner of playerCorners) {
+            if (this.pointInPolygon(corner, worldPoints)) {
+                return true;
+            }
+        }
+        
+        // Check if any polygon point is inside player rectangle
+        for (const point of worldPoints) {
+            if (point.x >= playerX && point.x <= playerX + playerWidth &&
+                point.y >= playerY && point.y <= playerY + playerHeight) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    checkHouseEllipseCollision(playerX, playerY, playerWidth, playerHeight, house) {
+        const centerX = house.x + house.width / 2;
+        const centerY = house.y + house.height / 2;
+        const radiusX = house.width / 2;
+        const radiusY = house.height / 2;
+        
+        // Check if any player corner is inside the ellipse
+        const playerCorners = [
+            { x: playerX, y: playerY },
+            { x: playerX + playerWidth, y: playerY },
+            { x: playerX, y: playerY + playerHeight },
+            { x: playerX + playerWidth, y: playerY + playerHeight }
+        ];
+        
+        for (const corner of playerCorners) {
+            const dx = corner.x - centerX;
+            const dy = corner.y - centerY;
+            const normalizedX = (dx * dx) / (radiusX * radiusX);
+            const normalizedY = (dy * dy) / (radiusY * radiusY);
+            
+            if (normalizedX + normalizedY <= 1) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    checkHouseRectangleCollision(playerX, playerY, playerWidth, playerHeight, house) {
+        return !(playerX + playerWidth < house.x || 
+                playerX > house.x + house.width || 
+                playerY + playerHeight < house.y || 
+                playerY > house.y + house.height);
+    }
+    
+    // Reuse point-in-polygon method from MapManager
+    pointInPolygon(point, polygon) {
+        let inside = false;
+        
+        for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+            if (((polygon[i].y > point.y) !== (polygon[j].y > point.y)) &&
+                (point.x < (polygon[j].x - polygon[i].x) * (point.y - polygon[i].y) / (polygon[j].y - polygon[i].y) + polygon[i].x)) {
+                inside = !inside;
+            }
+        }
+        
+        return inside;
+    }
+    
     showInteractionButton(house) {
         if (!this.interactionButton) {
             this.createInteractionButton();
         }
         
-        this.interactionButton.style.display = 'block';
+        // Update button text
         this.interactionButton.innerHTML = `🏠 Enter ${house.name}`;
         
-        // Show notification with house-specific message
-        let notificationMessage;
-        switch (house.type) {
-            case 'home':
-                notificationMessage = `🏠 You're near your home! Click to enter.`;
-                break;
-            case 'feedback':
-                notificationMessage = `📝 You're near the Feedback Center! Click to view your feedback.`;
-                break;
-            case 'missions':
-                notificationMessage = `📋 You're near the Mission Station! Click to submit your daily missions.`;
-                break;
-            case 'history':
-                notificationMessage = `📖 You're near the History Archive! Click to explore.`;
-                break;
-            default:
-                notificationMessage = `🏠 You're near ${house.name}! Click to enter.`;
-        }
+        // Show button with slide-up animation
+        this.interactionButton.style.display = 'block';
+        this.interactionButton.style.transform = 'translateX(-50%) translateY(100px)'; // Start below screen
+        this.interactionButton.style.opacity = '0';
         
-        this.game.auth.showBottomNotification(notificationMessage, 'info', 2000);
+        // Animate slide up
+        setTimeout(() => {
+            this.interactionButton.style.transform = 'translateX(-50%) translateY(0)';
+            this.interactionButton.style.opacity = '1';
+        }, 50);
+        
+        console.log(`🏠 Showing interaction button for: ${house.name} (${house.type})`);
     }
     
     hideInteractionButton() {
         if (this.interactionButton) {
-            this.interactionButton.style.display = 'none';
+            // Animate slide down
+            this.interactionButton.style.transform = 'translateX(-50%) translateY(100px)';
+            this.interactionButton.style.opacity = '0';
+            
+            // Hide after animation
+            setTimeout(() => {
+                this.interactionButton.style.display = 'none';
+            }, 300);
+            
+            console.log('🏠 Hiding interaction button');
         }
     }
     
@@ -3353,7 +4240,8 @@ class HouseInteractionManager {
                 
                 btn.addEventListener('click', (e) => {
                     const action = e.target.getAttribute('data-action');
-                    this.handleHouseAction(action, house);
+                    const buttonIndex = e.target.getAttribute('data-button-index');
+                    this.handleHouseAction(action, house, buttonIndex);
                 });
                 
                 btn.addEventListener('mouseenter', () => {
@@ -3386,58 +4274,207 @@ class HouseInteractionManager {
     }
     
     getHouseActions(house) {
-        switch (house.type) {
-            case 'home':
-                return `
-                    <button class="house-action-btn" data-action="view-feedbacks">📝 View Feedbacks from Admins</button>
-                    <button class="house-action-btn" data-action="view-missions">📋 View Your Submitted Missions</button>
-                    <button class="house-action-btn" data-action="view-all">📊 View All Activity</button>
-                `;
-            case 'feedback':
-                return `
-                    <button class="house-action-btn" data-action="view-feedback">📝 View Feedback</button>
-                    <button class="house-action-btn" data-action="feedback-history">📊 Feedback History</button>
-                    <button class="house-action-btn" data-action="feedback-settings">⚙️ Feedback Settings</button>
-                `;
-            case 'missions':
-                return `
-                    <button class="house-action-btn" data-action="submit-mission">📋 Submit Daily Mission</button>
-                    <button class="house-action-btn" data-action="mission-status">📈 Mission Status</button>
-                    <button class="house-action-btn" data-action="mission-history">📚 Mission History</button>
-                `;
-            case 'history':
-                return `
-                    <button class="house-action-btn" data-action="view-history" disabled>📖 View History (Coming Soon)</button>
-                    <button class="house-action-btn" data-action="achievements" disabled>🏆 Achievements (Coming Soon)</button>
-                    <button class="house-action-btn" data-action="statistics" disabled>📊 Statistics (Coming Soon)</button>
-                `;
-            default:
-                return `
-                    <button class="house-action-btn" data-action="explore">🔍 Explore</button>
-                `;
+        const houseNumber = house.layerNumber.toString();
+        const config = this.houseButtonConfig[houseNumber];
+        
+        if (!config || !config.buttons || config.buttons.length === 0) {
+            // Fallback to default actions
+            return this.getDefaultHouseActions(house);
         }
+        
+        // Generate buttons from CSV configuration
+        return config.buttons.map((button, index) => {
+            const buttonId = `house-btn-${houseNumber}-${index}`;
+            return `
+                <div class="house-button-container">
+                    <button class="house-action-btn" data-action="${button.name.toLowerCase().replace(/\s+/g, '-')}" data-house="${houseNumber}" data-button-index="${index}">
+                        ${button.name}
+                    </button>
+                </div>
+            `;
+        }).join('');
     }
     
-    handleHouseAction(action, house) {
+    getDefaultHouseActions(house) {
+        return `
+            <button class="house-action-btn" data-action="explore">🔍 Explore</button>
+            <button class="house-action-btn" data-action="rest">😴 Rest</button>
+            <button class="house-action-btn" data-action="info">ℹ️ Info</button>
+        `;
+    }
+    
+    handleHouseAction(action, house, buttonIndex) {
         const modal = document.getElementById('house-modal');
         modal.style.display = 'none';
         
-        switch (house.type) {
-            case 'home':
-                this.handleHomeActions(action, house);
-                break;
-            case 'feedback':
-                this.handleFeedbackActions(action, house);
-                break;
-            case 'missions':
-                this.handleMissionActions(action, house);
-                break;
-            case 'history':
-                this.handleHistoryActions(action, house);
-                break;
-            default:
-                this.game.auth.showBottomNotification('🔍 Exploring...', 'info');
+        const houseNumber = house.layerNumber.toString();
+        const config = this.houseButtonConfig[houseNumber];
+        
+        if (config && config.buttons && config.buttons[buttonIndex]) {
+            const button = config.buttons[buttonIndex];
+            this.showButtonForm(house, button);
+        } else {
+            this.game.auth.showBottomNotification('🔍 Exploring...', 'info');
         }
+    }
+    
+    showButtonForm(house, button) {
+        // Create form modal
+        let formModal = document.getElementById('button-form-modal');
+        if (!formModal) {
+            formModal = document.createElement('div');
+            formModal.id = 'button-form-modal';
+            formModal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                display: none;
+                justify-content: center;
+                align-items: center;
+                z-index: 3000;
+                backdrop-filter: blur(5px);
+                -webkit-backdrop-filter: blur(5px);
+            `;
+            document.body.appendChild(formModal);
+        }
+        
+        const formContent = document.createElement('div');
+        formContent.style.cssText = `
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 20px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        `;
+        
+        // Generate form fields based on button inputs
+        const formFields = button.inputs.map((input, index) => `
+            <div class="form-field">
+                <label for="input-${index}">${input}:</label>
+                <input type="text" id="input-${index}" name="input-${index}" placeholder="Enter ${input}" style="
+                    width: 100%;
+                    padding: 12px;
+                    border: 2px solid #e1e5e9;
+                    border-radius: 8px;
+                    font-size: 16px;
+                    margin-top: 5px;
+                    box-sizing: border-box;
+                    transition: border-color 0.3s ease;
+                ">
+            </div>
+        `).join('');
+        
+        formContent.innerHTML = `
+            <h2 style="margin: 0 0 20px 0; color: #1d1d1f; font-size: 24px; text-align: center;">
+                ${button.name}
+            </h2>
+            <p style="margin: 0 0 30px 0; color: #666; font-size: 16px; text-align: center;">
+                Fill in the required information:
+            </p>
+            <form id="button-form" style="display: flex; flex-direction: column; gap: 20px;">
+                ${formFields}
+                <div style="display: flex; gap: 15px; justify-content: center; margin-top: 30px;">
+                    <button type="button" id="cancel-form" style="
+                        background: rgba(255, 59, 48, 0.1);
+                        color: #ff3b30;
+                        border: 2px solid rgba(255, 59, 48, 0.3);
+                        padding: 12px 24px;
+                        border-radius: 12px;
+                        font-size: 16px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                    ">Cancel</button>
+                    <button type="submit" style="
+                        background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
+                        color: white;
+                        border: none;
+                        padding: 12px 24px;
+                        border-radius: 12px;
+                        font-size: 16px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                    ">Submit</button>
+                </div>
+            </form>
+            <button id="close-form-modal" style="
+                position: absolute;
+                top: 15px;
+                right: 15px;
+                background: none;
+                border: none;
+                font-size: 24px;
+                cursor: pointer;
+                color: #666;
+            ">×</button>
+        `;
+        
+        formModal.innerHTML = '';
+        formModal.appendChild(formContent);
+        formModal.style.display = 'flex';
+        
+        // Add event listeners
+        document.getElementById('cancel-form').addEventListener('click', () => {
+            formModal.style.display = 'none';
+        });
+        
+        document.getElementById('close-form-modal').addEventListener('click', () => {
+            formModal.style.display = 'none';
+        });
+        
+        formModal.addEventListener('click', (e) => {
+            if (e.target === formModal) {
+                formModal.style.display = 'none';
+            }
+        });
+        
+        document.getElementById('button-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.handleFormSubmission(house, button, formModal);
+        });
+        
+        // Add input focus effects
+        formContent.querySelectorAll('input').forEach(input => {
+            input.addEventListener('focus', () => {
+                input.style.borderColor = '#007AFF';
+            });
+            input.addEventListener('blur', () => {
+                input.style.borderColor = '#e1e5e9';
+            });
+        });
+    }
+    
+    handleFormSubmission(house, button, formModal) {
+        const form = document.getElementById('button-form');
+        const formData = new FormData(form);
+        const data = {};
+        
+        // Collect form data
+        button.inputs.forEach((input, index) => {
+            const value = document.getElementById(`input-${index}`).value;
+            data[input] = value;
+        });
+        
+        console.log(`📝 Form submitted for ${button.name} in ${house.name}:`, data);
+        
+        // Show success message
+        this.game.auth.showBottomNotification(`✅ ${button.name} submitted successfully!`, 'success');
+        
+        // Close modal
+        formModal.style.display = 'none';
+        
+        // Here you can add logic to save the data to Firebase or handle it as needed
+        // For now, we just log it and show a success message
     }
     
     handleHomeActions(action, house) {
@@ -4456,12 +5493,24 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
     
-    // Make updateStats method available globally for manual stat updates
-    window.updatePlayerStats = (updates) => {
-        if (window.game && window.game.auth) {
-            return window.game.auth.updateStats(updates);
-        } else {
-            console.log("❌ Game not initialized yet");
-        }
-    };
+        // Make updateStats method available globally for manual stat updates
+        window.updatePlayerStats = (updates) => {
+            if (window.game && window.game.auth) {
+                return window.game.auth.updateStats(updates);
+            } else {
+                console.log("❌ Game not initialized yet");
+            }
+        };
+        
+        // Make polygon collision test available globally
+        window.testPolygonCollision = (x, y, width = 24, height = 31.2) => {
+            if (window.game && window.game.map) {
+                console.log(`🧪 Testing polygon collision at (${x}, ${y}) size (${width}, ${height})`);
+                const result = window.game.map.checkCollision(x, y, width, height);
+                console.log(`Result: ${result ? 'COLLISION' : 'NO COLLISION'}`);
+                return result;
+            } else {
+                console.log("❌ Game not initialized yet");
+            }
+        };
 });
