@@ -267,9 +267,14 @@ class AdventureGame {
         // Apply camera transform
         this.camera.applyTransform(this.ctx);
         
-        // Render game world
+        // Render game world (base map first)
         this.map.render(this.ctx);
+        
+        // Render player
         this.player.render(this.ctx);
+        
+        // Render upper layer on top of player (for depth effect)
+        this.map.renderUpperLayer(this.ctx);
         
         // Restore context state
         this.ctx.restore();
@@ -444,7 +449,7 @@ class Camera {
         this.targetX = 0;
         this.targetY = 0;
         this.followSpeed = 0.25;
-        this.zoom = 2.0; // Zoom in on player
+        this.zoom = 1.538; // Zoom out by 1.3x (was 2.0)
         this.viewport = { width: 0, height: 0 };
         this.bounds = null;
     }
@@ -512,6 +517,7 @@ class MapManager {
     constructor(game) {
         this.game = game;
         this.worldMap = null;
+        this.upperLayer = null; // Upper layer for depth effect
         this.collisionLayer = null;
         this.width = 0;
         this.height = 0;
@@ -528,6 +534,9 @@ class MapManager {
         
         // Load world map image
         this.worldMap = await this.loadImage('realisticmap.png');
+        
+        // Load upper layer for depth effect
+        this.upperLayer = await this.loadImage('upper layer.png');
         
         // Load collision data
         await this.loadCollisionData();
@@ -1049,6 +1058,17 @@ class MapManager {
         if (this.hasUnreadFeedback) {
             this.renderHomeAlert(ctx);
         }
+    }
+    
+    // Render upper layer separately (called after player)
+    renderUpperLayer(ctx) {
+        if (!this.upperLayer) return;
+        
+        const mapWidth = this.width * this.tileWidth;
+        const mapHeight = this.height * this.tileHeight;
+        
+        // Render upper layer for depth effect (hides player when behind it)
+        ctx.drawImage(this.upperLayer, 0, 0, mapWidth, mapHeight);
     }
     
     // Debug visualization for collision shapes
@@ -2466,12 +2486,18 @@ class AuthManager {
         // Stats HUD buttons
         const logoutButton = document.getElementById('logoutButton');
         if (logoutButton) {
+            console.log('✅ Logout button found and event listener attached');
             logoutButton.addEventListener('click', () => this.handleLogout());
+        } else {
+            console.log('❌ Logout button not found');
         }
         
         const hudRefreshButton = document.getElementById('hudRefreshButton');
         if (hudRefreshButton) {
+            console.log('✅ HUD Refresh button found and event listener attached');
             hudRefreshButton.addEventListener('click', () => this.handleHudRefresh());
+        } else {
+            console.log('❌ HUD Refresh button not found');
         }
         
         // Login form refresh button
@@ -2611,10 +2637,12 @@ class AuthManager {
     }
     
     async handleLogout() {
+        console.log('🚪 Logout button clicked!');
         try {
             await window.auth.signOut();
+            console.log('✅ User logged out successfully');
         } catch (error) {
-            console.error('Logout error:', error);
+            console.error('❌ Logout error:', error);
         }
     }
     

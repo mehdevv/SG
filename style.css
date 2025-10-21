@@ -605,35 +605,37 @@ body {
     line-height: 1;
 }
 
-/* Hidden Actions */
+/* Bottom Right Actions */
 .hud-actions {
     position: absolute;
-    top: 20px;
+    bottom: 20px;
     right: 20px;
     display: flex;
     gap: 8px;
     align-items: center;
+    pointer-events: auto;
+    z-index: 200;
 }
 
 .stats-action-btn {
-    background: rgba(255, 255, 255, 0.9);
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    border-radius: 8px;
-    padding: 8px;
+    background: rgba(255, 255, 255, 0.95);
+    border: 2px solid rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+    padding: 10px;
     cursor: pointer;
     transition: all 0.2s ease;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    width: 40px;
+    height: 40px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .stats-action-btn:hover {
     background: #f8f9fa;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
 }
 
 .stats-action-btn:active {
