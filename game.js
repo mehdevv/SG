@@ -1706,46 +1706,117 @@ class UIManager {
                 background: rgba(255, 255, 255, 0.95);
                 padding: 30px;
                 border-radius: 20px;
-                max-width: 400px;
+                max-width: 700px;
                 width: 90%;
+                max-height: 85vh;
+                overflow-y: auto;
                 backdrop-filter: blur(20px);
                 -webkit-backdrop-filter: blur(20px);
                 border: 1px solid rgba(255, 255, 255, 0.2);
                 box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
                 position: relative;
-                text-align: center;
+                text-align: left;
             `;
             
             modalContent.innerHTML = `
-                <h2 style="margin: 0 0 20px 0; color: #1d1d1f; font-size: 24px;">👤 Profile</h2>
+                <h2 style="margin: 0 0 20px 0; color: #1d1d1f; font-size: 24px;">👤 Player Profile</h2>
                 
-                <div style="margin-bottom: 20px;">
-                    <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%); border-radius: 50%; margin: 0 auto 15px; display: flex; align-items: center; justify-content: center; font-size: 32px; color: white;">
-                        👤
+                <!-- Profile Header -->
+                <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 25px; padding: 20px; background: rgba(0, 0, 0, 0.05); border-radius: 15px;">
+                    <div style="position: relative;">
+                        <div style="width: 100px; height: 100px; background: linear-gradient(135deg, #4CAF50, #2196F3); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 40px; color: white; box-shadow: 0 8px 25px rgba(76, 175, 80, 0.3);">
+                            <img id="profilePicture" src="" alt="Profile" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: none;">
+                            <span id="profileInitials" style="font-weight: 700;">👤</span>
+                        </div>
                     </div>
-                    <h3 id="profileName" style="margin: 0 0 5px 0; color: #1d1d1f; font-size: 18px;">Loading...</h3>
-                    <p id="profileEmail" style="margin: 0; color: #666; font-size: 14px;">Loading...</p>
+                    
+                    <div style="flex: 1;">
+                        <h3 id="profileName" style="margin: 0 0 8px 0; color: #1d1d1f; font-size: 22px; font-weight: 600;">Player Name</h3>
+                        <p id="profileEmail" style="margin: 0 0 10px 0; color: #666; font-size: 14px;">user@example.com</p>
+                        <div id="profileStatus" style="display: inline-flex; align-items: center; gap: 8px; background: rgba(76, 175, 80, 0.1); color: #4CAF50; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; border: 1px solid rgba(76, 175, 80, 0.2);">
+                            <span>🟢</span>
+                            <span>Online</span>
+                        </div>
+                    </div>
                 </div>
                 
-                <div style="background: #f8f9fa; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
-                    <h4 style="margin: 0 0 15px 0; color: #1d1d1f; font-size: 16px;">📊 Statistics</h4>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                        <div>
-                            <div style="color: #666; font-size: 12px; margin-bottom: 5px;">Level</div>
-                            <div id="profileLevel" style="color: #1d1d1f; font-size: 18px; font-weight: 600;">1</div>
+                <!-- Main Stats Grid -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; margin-bottom: 25px;">
+                    <div style="background: linear-gradient(135deg, rgba(76, 175, 80, 0.1), rgba(76, 175, 80, 0.05)); padding: 20px; border-radius: 15px; text-align: center; border: 1px solid rgba(76, 175, 80, 0.2);">
+                        <div style="color: #4CAF50; font-size: 16px; font-weight: 600; margin-bottom: 8px;">🎯 Level</div>
+                        <div id="profileLevel" style="color: #1d1d1f; font-size: 28px; font-weight: 700;">1</div>
+                        <div id="levelProgress" style="margin-top: 8px; background: rgba(0, 0, 0, 0.1); height: 4px; border-radius: 2px; overflow: hidden;">
+                            <div style="background: linear-gradient(90deg, #4CAF50, #8BC34A); height: 100%; width: 0%; transition: width 0.3s ease;"></div>
                         </div>
-                        <div>
-                            <div style="color: #666; font-size: 12px; margin-bottom: 5px;">Coins</div>
-                            <div id="profileCoins" style="color: #1d1d1f; font-size: 18px; font-weight: 600;">0 DZD</div>
+                    </div>
+                    
+                    <div style="background: linear-gradient(135deg, rgba(255, 215, 0, 0.1), rgba(255, 215, 0, 0.05)); padding: 20px; border-radius: 15px; text-align: center; border: 1px solid rgba(255, 215, 0, 0.2);">
+                        <div style="color: #FFD700; font-size: 16px; font-weight: 600; margin-bottom: 8px;">💰 Coins</div>
+                        <div id="profileCoins" style="color: #1d1d1f; font-size: 28px; font-weight: 700;">0 DZD</div>
+                        <div style="color: #666; font-size: 12px; margin-top: 4px;">Total Earned</div>
+                    </div>
+                    
+                    <div style="background: linear-gradient(135deg, rgba(33, 150, 243, 0.1), rgba(33, 150, 243, 0.05)); padding: 20px; border-radius: 15px; text-align: center; border: 1px solid rgba(33, 150, 243, 0.2);">
+                        <div style="color: #2196F3; font-size: 16px; font-weight: 600; margin-bottom: 8px;">⭐ Experience</div>
+                        <div id="profileExp" style="color: #1d1d1f; font-size: 28px; font-weight: 700;">0</div>
+                        <div id="expToNext" style="color: #666; font-size: 12px; margin-top: 4px;">0 to next level</div>
+                    </div>
+                    
+                    <div style="background: linear-gradient(135deg, rgba(156, 39, 176, 0.1), rgba(156, 39, 176, 0.05)); padding: 20px; border-radius: 15px; text-align: center; border: 1px solid rgba(156, 39, 176, 0.2);">
+                        <div style="color: #9C27B0; font-size: 16px; font-weight: 600; margin-bottom: 8px;">🏆 Quests</div>
+                        <div id="profileQuests" style="color: #1d1d1f; font-size: 28px; font-weight: 700;">0</div>
+                        <div style="color: #666; font-size: 12px; margin-top: 4px;">Completed</div>
+                    </div>
+                </div>
+                
+                <!-- Detailed Analytics -->
+                <div style="background: rgba(0, 0, 0, 0.05); border-radius: 15px; padding: 20px; margin-bottom: 20px; border: 1px solid rgba(0, 0, 0, 0.1);">
+                    <h4 style="margin: 0 0 20px 0; color: #1d1d1f; font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                        📊 Account Analytics
+                    </h4>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px;">
+                        <div style="background: rgba(255, 255, 255, 0.5); padding: 15px; border-radius: 10px; border: 1px solid rgba(0, 0, 0, 0.1);">
+                            <div style="color: #FF9800; font-size: 14px; font-weight: 600; margin-bottom: 5px;">🎮 Games Played</div>
+                            <div id="gamesPlayed" style="color: #1d1d1f; font-size: 20px; font-weight: 700;">0</div>
                         </div>
-                        <div>
-                            <div style="color: #666; font-size: 12px; margin-bottom: 5px;">Experience</div>
-                            <div id="profileExp" style="color: #1d1d1f; font-size: 18px; font-weight: 600;">0</div>
+                        
+                        <div style="background: rgba(255, 255, 255, 0.5); padding: 15px; border-radius: 10px; border: 1px solid rgba(0, 0, 0, 0.1);">
+                            <div style="color: #E91E63; font-size: 14px; font-weight: 600; margin-bottom: 5px;">⏱️ Play Time</div>
+                            <div id="playTime" style="color: #1d1d1f; font-size: 20px; font-weight: 700;">0h 0m</div>
                         </div>
-                        <div>
-                            <div style="color: #666; font-size: 12px; margin-bottom: 5px;">Status</div>
-                            <div style="color: #34C759; font-size: 18px; font-weight: 600;">🟢 Online</div>
+                        
+                        <div style="background: rgba(255, 255, 255, 0.5); padding: 15px; border-radius: 10px; border: 1px solid rgba(0, 0, 0, 0.1);">
+                            <div style="color: #00BCD4; font-size: 14px; font-weight: 600; margin-bottom: 5px;">🏅 Achievements</div>
+                            <div id="achievements" style="color: #1d1d1f; font-size: 20px; font-weight: 700;">0</div>
                         </div>
+                        
+                        <div style="background: rgba(255, 255, 255, 0.5); padding: 15px; border-radius: 10px; border: 1px solid rgba(0, 0, 0, 0.1);">
+                            <div style="color: #4CAF50; font-size: 14px; font-weight: 600; margin-bottom: 5px;">📅 Member Since</div>
+                            <div id="memberSince" style="color: #1d1d1f; font-size: 16px; font-weight: 600;">Today</div>
+                        </div>
+                        
+                        <div style="background: rgba(255, 255, 255, 0.5); padding: 15px; border-radius: 10px; border: 1px solid rgba(0, 0, 0, 0.1);">
+                            <div style="color: #9C27B0; font-size: 14px; font-weight: 600; margin-bottom: 5px;">🎯 Win Rate</div>
+                            <div id="winRate" style="color: #1d1d1f; font-size: 20px; font-weight: 700;">0%</div>
+                        </div>
+                        
+                        <div style="background: rgba(255, 255, 255, 0.5); padding: 15px; border-radius: 10px; border: 1px solid rgba(0, 0, 0, 0.1);">
+                            <div style="color: #FF5722; font-size: 14px; font-weight: 600; margin-bottom: 5px;">🔥 Streak</div>
+                            <div id="currentStreak" style="color: #1d1d1f; font-size: 20px; font-weight: 700;">0 days</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Recent Activity -->
+                <div style="background: rgba(0, 0, 0, 0.05); border-radius: 15px; padding: 20px; margin-bottom: 20px; border: 1px solid rgba(0, 0, 0, 0.1);">
+                    <h4 style="margin: 0 0 15px 0; color: #1d1d1f; font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                        📈 Recent Activity
+                    </h4>
+                    <div id="recentActivity" style="color: #666; font-size: 14px; line-height: 1.6;">
+                        <div>• Welcome to the game!</div>
+                        <div>• Profile created successfully</div>
+                        <div>• Ready to start your journey</div>
                     </div>
                 </div>
                 
@@ -1773,7 +1844,7 @@ class UIManager {
                 ">×</button>
             `;
             
-            modal.appendChild(modalContent);
+            profileModal.appendChild(modalContent);
             document.body.appendChild(profileModal);
             
             // Add event listeners
@@ -1793,23 +1864,219 @@ class UIManager {
         }
         
         // Update profile information
-        if (this.game && this.game.auth && this.game.auth.user) {
-            const user = this.game.auth.user;
-            const stats = this.game.auth.userStats;
-            
-            document.getElementById('profileName').textContent = user.displayName || user.email || 'User';
-            document.getElementById('profileEmail').textContent = user.email || 'No email';
-            document.getElementById('profileLevel').textContent = stats?.level || 1;
-            document.getElementById('profileCoins').textContent = `${stats?.points || 0} DZD`;
-            document.getElementById('profileExp').textContent = stats?.experience || 0;
-        }
+        this.updateProfileInfo();
         
         profileModal.style.display = 'flex';
     }
     
-    handleLogout() {
+    updateProfileInfo() {
+        // Try multiple sources for user data
+        let user = null;
+        let stats = null;
+        
+        // Try to get user from game auth
         if (this.game && this.game.auth) {
-            this.game.auth.logout();
+            user = this.game.auth.user;
+            stats = this.game.auth.userStats;
+        }
+        
+        // Try to get user from window auth
+        if (!user && window.auth && window.auth.user) {
+            user = window.auth.user;
+        }
+        
+        // Try to get user from Firebase auth
+        if (!user && window.firebase && window.firebase.auth().currentUser) {
+            user = window.firebase.auth().currentUser;
+        }
+        
+        // Get user data from localStorage as fallback
+        const savedUserData = JSON.parse(localStorage.getItem('userData') || '{}');
+        const savedStats = JSON.parse(localStorage.getItem('userStats') || '{}');
+        
+        // Merge saved data with current data
+        const finalStats = { ...savedStats, ...stats };
+        const finalUser = { ...savedUserData, ...user };
+        
+        // Update profile elements
+        const nameEl = document.getElementById('profileName');
+        const emailEl = document.getElementById('profileEmail');
+        const levelEl = document.getElementById('profileLevel');
+        const coinsEl = document.getElementById('profileCoins');
+        const expEl = document.getElementById('profileExp');
+        const questsEl = document.getElementById('profileQuests');
+        const gamesPlayedEl = document.getElementById('gamesPlayed');
+        const playTimeEl = document.getElementById('playTime');
+        const achievementsEl = document.getElementById('achievements');
+        const memberSinceEl = document.getElementById('memberSince');
+        const winRateEl = document.getElementById('winRate');
+        const currentStreakEl = document.getElementById('currentStreak');
+        const expToNextEl = document.getElementById('expToNext');
+        const levelProgressEl = document.getElementById('levelProgress');
+        const profilePictureEl = document.getElementById('profilePicture');
+        const profileInitialsEl = document.getElementById('profileInitials');
+        
+        // Basic profile info
+        if (nameEl) {
+            const displayName = finalUser?.displayName || finalUser?.email?.split('@')[0] || 'Player';
+            nameEl.textContent = displayName;
+            
+            // Set initials for avatar
+            if (profileInitialsEl) {
+                const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+                profileInitialsEl.textContent = initials || '👤';
+            }
+        }
+        
+        if (emailEl) {
+            emailEl.textContent = finalUser?.email || 'No email available';
+        }
+        
+        // Profile picture
+        if (profilePictureEl && finalUser?.photoURL) {
+            profilePictureEl.src = finalUser.photoURL;
+            profilePictureEl.style.display = 'block';
+            if (profileInitialsEl) profileInitialsEl.style.display = 'none';
+        }
+        
+        // Main stats
+        const level = finalStats?.level || 1;
+        const experience = finalStats?.experience || 0;
+        const coins = finalStats?.points || 0;
+        const quests = finalStats?.questsCompleted || 0;
+        
+        if (levelEl) {
+            levelEl.textContent = level;
+        }
+        
+        if (coinsEl) {
+            coinsEl.textContent = `${coins.toLocaleString()} DZD`;
+        }
+        
+        if (expEl) {
+            expEl.textContent = experience.toLocaleString();
+        }
+        
+        if (questsEl) {
+            questsEl.textContent = quests;
+        }
+        
+        // Level progress
+        const expForNextLevel = level * 1000; // 1000 XP per level
+        const currentLevelExp = experience % expForNextLevel;
+        const progressPercent = (currentLevelExp / expForNextLevel) * 100;
+        
+        if (expToNextEl) {
+            expToNextEl.textContent = `${(expForNextLevel - currentLevelExp).toLocaleString()} to next level`;
+        }
+        
+        if (levelProgressEl) {
+            const progressBar = levelProgressEl.querySelector('div');
+            if (progressBar) {
+                progressBar.style.width = `${Math.min(progressPercent, 100)}%`;
+            }
+        }
+        
+        // Analytics
+        const gamesPlayed = finalStats?.gamesPlayed || 0;
+        const playTimeMinutes = finalStats?.playTimeMinutes || 0;
+        const achievements = finalStats?.achievements || 0;
+        const memberSince = finalUser?.createdAt || new Date().toISOString();
+        const wins = finalStats?.wins || 0;
+        const losses = finalStats?.losses || 0;
+        const winRate = gamesPlayed > 0 ? Math.round((wins / gamesPlayed) * 100) : 0;
+        const currentStreak = finalStats?.currentStreak || 0;
+        
+        if (gamesPlayedEl) {
+            gamesPlayedEl.textContent = gamesPlayed.toLocaleString();
+        }
+        
+        if (playTimeEl) {
+            const hours = Math.floor(playTimeMinutes / 60);
+            const minutes = playTimeMinutes % 60;
+            playTimeEl.textContent = `${hours}h ${minutes}m`;
+        }
+        
+        if (achievementsEl) {
+            achievementsEl.textContent = achievements;
+        }
+        
+        if (memberSinceEl) {
+            const date = new Date(memberSince);
+            const now = new Date();
+            const diffTime = Math.abs(now - date);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            if (diffDays === 1) {
+                memberSinceEl.textContent = 'Today';
+            } else if (diffDays < 7) {
+                memberSinceEl.textContent = `${diffDays} days ago`;
+            } else if (diffDays < 30) {
+                memberSinceEl.textContent = `${Math.floor(diffDays / 7)} weeks ago`;
+            } else {
+                memberSinceEl.textContent = date.toLocaleDateString();
+            }
+        }
+        
+        if (winRateEl) {
+            winRateEl.textContent = `${winRate}%`;
+        }
+        
+        if (currentStreakEl) {
+            currentStreakEl.textContent = `${currentStreak} days`;
+        }
+        
+        // Recent activity
+        const recentActivityEl = document.getElementById('recentActivity');
+        if (recentActivityEl) {
+            const activities = [
+                `• Welcome to the game!`,
+                `• Profile created successfully`,
+                `• Ready to start your journey`,
+                `• Level ${level} achieved`,
+                `• ${coins.toLocaleString()} DZD earned`,
+                `• ${quests} quests completed`,
+                `• ${achievements} achievements unlocked`
+            ].slice(0, 5); // Show last 5 activities
+            
+            recentActivityEl.innerHTML = activities.map(activity => `<div>${activity}</div>`).join('');
+        }
+        
+        console.log('👤 Enhanced profile info updated:', { 
+            user: finalUser, 
+            stats: finalStats,
+            level,
+            experience,
+            coins,
+            quests,
+            gamesPlayed,
+            winRate
+        });
+    }
+    
+    async handleLogout() {
+        console.log('🚪 Logout initiated from settings dropdown');
+        try {
+            // Try multiple logout methods to ensure it works
+            if (this.game && this.game.auth && this.game.auth.logout) {
+                await this.game.auth.logout();
+            } else if (window.auth && window.auth.signOut) {
+                await window.auth.signOut();
+            } else if (window.firebase && window.firebase.auth) {
+                await window.firebase.auth().signOut();
+            } else {
+                // Fallback: clear local storage and reload
+                localStorage.clear();
+                sessionStorage.clear();
+                window.location.reload();
+            }
+            console.log('✅ User logged out successfully');
+        } catch (error) {
+            console.error('❌ Logout error:', error);
+            // Fallback logout
+            localStorage.clear();
+            sessionStorage.clear();
+            window.location.reload();
         }
     }
     
