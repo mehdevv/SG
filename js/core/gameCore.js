@@ -225,11 +225,12 @@ class GameCore {
             this.collision.setWallsData(data);
         }
         
-        // Set camera bounds based on map size
+        // Set camera bounds based on map size with 5-pixel buffer at bottom to hide white line
         if (this.camera && data.width && data.height) {
             const mapWidth = data.width * (data.tilewidth || 32);
             const mapHeight = data.height * (data.tileheight || 32);
-            this.camera.setBounds(0, 0, mapWidth, mapHeight);
+            // Reduce the camera bounds by 5 pixels from the bottom to hide the white line
+            this.camera.setBounds(0, 0, mapWidth, mapHeight - 5);
         }
             
             this.updateLoadingProgress('Collision data loaded');

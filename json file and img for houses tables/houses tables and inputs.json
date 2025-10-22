@@ -1,0 +1,264 @@
+{
+    "houses": [
+      {
+        "id": 1,
+        "name": "Login",
+        "coordinates": {
+          "x": 344,
+          "y": 256
+        },
+        "fields": [
+          {
+            "label": "Password",
+            "type": "password"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "name": "Seminar Management",
+        "coordinates": {
+          "x": 36,
+          "y": 426
+        },
+        "sections": [
+          {
+            "name": "Seminar Info",
+            "fields": [
+              { "label": "Titles", "type": "text" },
+              { "label": "Start Time", "type": "time" },
+              { "label": "End Time", "type": "time" },
+              { "label": "Number of Participants", "type": "number" },
+              { "label": "Number of Certificates", "type": "number" }
+            ]
+          },
+          {
+            "name": "Phone Info",
+            "fields": [
+              { "label": "Training", "type": "text" },
+              { "label": "Group", "type": "text" },
+              { "label": "Session", "type": "select", "options": ["1st", "2nd", "3rd", "..."] }
+            ]
+          },
+          {
+            "name": "Entry Type",
+            "conditionalGroups": [
+              {
+                "condition": "voucher",
+                "fields": [
+                  { "label": "Remaining Vouchers", "type": "number" },
+                  { "label": "Vouchers Entered", "type": "number" }
+                ]
+              },
+              {
+                "condition": "registration_form",
+                "fields": [
+                  { "label": "Remaining Forms", "type": "number" },
+                  { "label": "Forms Entered", "type": "number" }
+                ]
+              },
+              {
+                "condition": "diploma",
+                "fields": [
+                  { "label": "Remaining Diplomas", "type": "number" },
+                  { "label": "Diplomas Entered", "type": "number" }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "Hygiene",
+            "fields": [
+              { "label": "District", "type": "text" },
+              { "label": "Province", "type": "text" },
+              { "label": "Completed by", "type": "text" },
+              { "label": "Percentage", "type": "number" }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "name": "Analytics & History",
+        "coordinates": {
+          "x": 310,
+          "y": 744
+        },
+        "sections": [
+          {
+            "name": "Improvement Ideas",
+            "fields": [
+              { "label": "Titles", "type": "text" },
+              { "label": "Details", "type": "textarea" }
+            ]
+          },
+          {
+            "name": "Other Players' Missions",
+            "type": "readonly",
+            "description": "Displays other players' missions based on player name"
+          },
+          {
+            "name": "Leaderboard",
+            "type": "readonly",
+            "description": "Displays the current ranking"
+          },
+          {
+            "name": "Coin History",
+            "type": "readonly",
+            "description": "Displays coin history by calendar date"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "name": "Time Tracking",
+        "coordinates": {
+          "x": 794,
+          "y": 516
+        },
+        "fields": [
+          { "label": "Arrival Time", "type": "time" },
+          { "label": "Departure Time", "type": "time" },
+          { "label": "Comments", "type": "textarea" }
+        ]
+      },
+      {
+        "id": 5,
+        "name": "Administrative Data",
+        "coordinates": {
+          "x": 782,
+          "y": 804
+        },
+        "sections": [
+          {
+            "name": "Diploma",
+            "fields": [
+              { "label": "First Name", "type": "text" },
+              { "label": "Last Name", "type": "text" },
+              { "label": "Phone Number", "type": "text" },
+              { "label": "Training", "type": "text" }
+            ]
+          },
+          {
+            "name": "Registration Form",
+            "fields": [
+              { "label": "First Name", "type": "text" },
+              { "label": "Last Name", "type": "text" },
+              { "label": "Phone Number", "type": "text" },
+              { "label": "Training", "type": "text" }
+            ]
+          },
+          {
+            "name": "Pre-Registration",
+            "fields": [
+              { "label": "First Name", "type": "text" },
+              { "label": "Last Name", "type": "text" },
+              { "label": "Phone Number", "type": "text" },
+              { "label": "Training", "type": "text" },
+              { "label": "Province", "type": "text" },
+              { "label": "District", "type": "text" },
+              { "label": "Facebook", "type": "text" }
+            ]
+          },
+          {
+            "name": "Cash Register",
+            "fields": [
+              { "label": "Cash Fund", "type": "number" },
+              { "label": "Vouchers", "type": "number" },
+              { "label": "Expenses", "type": "number" }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "name": "Media & Statistics",
+        "coordinates": {
+          "x": 152,
+          "y": 890
+        },
+        "sections": [
+          {
+            "name": "Photo / Video",
+            "fields": [
+              { "label": "Training", "type": "text" },
+              { "label": "Group", "type": "text" },
+              { "label": "Date", "type": "date" }
+            ]
+          },
+          {
+            "name": "Defense (Final Project)",
+            "fields": [
+              { "label": "Training", "type": "text" },
+              { "label": "Group", "type": "text" }
+            ]
+          },
+          {
+            "name": "Payment Report",
+            "fields": [
+              { "label": "Training", "type": "text" },
+              { "label": "Group", "type": "text" },
+              { "label": "Payment %", "type": "number" }
+            ]
+          },
+          {
+            "name": "Attendance Report",
+            "fields": [
+              { "label": "Training", "type": "text" },
+              { "label": "Group", "type": "text" },
+              { "label": "Attendance %", "type": "number" }
+            ]
+          },
+          {
+            "name": "Student Count",
+            "fields": [
+              { "label": "Training", "type": "text" },
+              { "label": "Group", "type": "text" },
+              { "label": "Number", "type": "number" }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "name": "Feedback & Tasks",
+        "coordinates": {
+          "x": 422,
+          "y": 1016
+        },
+        "sections": [
+          {
+            "name": "Tasks",
+            "type": "readonly",
+            "description": "Read-only view"
+          },
+          {
+            "name": "Feedback",
+            "type": "readonly",
+            "description": "Read-only view"
+          },
+          {
+            "name": "Customer Satisfaction",
+            "type": "readonly",
+            "description": "Read-only view"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "name": "Mission Planning",
+        "coordinates": {
+          "x": 816,
+          "y": 1090
+        },
+        "fields": [
+          {
+            "label": "Missions",
+            "type": "table",
+            "columns": ["Mission 1", "Mission 2", "Mission 3", "..."]
+          }
+        ]
+      }
+    ]
+  }
+  

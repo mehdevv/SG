@@ -572,7 +572,7 @@ body {
     background: rgba(0, 0, 0, 0.7);
     backdrop-filter: blur(10px);
     border-radius: 25px;
-    padding: 8px 12px;
+    padding: 13px 17px;
     border: 2px solid rgba(255, 255, 255, 0.2);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
@@ -603,6 +603,42 @@ body {
     font-weight: 500;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
     line-height: 1;
+}
+
+/* Settings Button */
+.settings-btn {
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    margin-top: 8px;
+    margin-left: auto;
+}
+
+.settings-btn:hover {
+    background: rgba(0, 0, 0, 0.8);
+    border-color: rgba(255, 255, 255, 0.4);
+}
+
+.settings-btn:active {
+    background: rgba(0, 0, 0, 0.9);
+    border-color: rgba(255, 255, 255, 0.6);
+    transform: scale(0.95);
+}
+
+.settings-icon {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.settings-btn:hover .settings-icon {
+    color: #fff;
 }
 
 /* Bottom Right Actions */

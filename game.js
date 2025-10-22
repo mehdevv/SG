@@ -1474,11 +1474,15 @@ class UIManager {
             userExpMax: document.getElementById('userExpMax'),
             playerAvatar: document.getElementById('playerAvatar'),
             questToggle: document.getElementById('questToggle'),
-            questPanel: document.getElementById('questPanel')
+            questPanel: document.getElementById('questPanel'),
+            settingsButton: document.getElementById('settingsButton')
         };
         
         // Setup quest panel functionality
         this.setupQuestPanel();
+        
+        // Setup settings button functionality
+        this.setupSettingsButton();
     }
     
     setupQuestPanel() {
@@ -1517,6 +1521,483 @@ class UIManager {
         this.elements.questPanel.classList.remove('open');
         this.elements.questToggle.classList.remove('open');
         console.log('📋 Quest panel pushed back behind arrow');
+    }
+    
+    setupSettingsButton() {
+        // Settings button click handler
+        if (this.elements.settingsButton) {
+            this.elements.settingsButton.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.toggleSettingsDropdown();
+            });
+        }
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.settings-dropdown') && !e.target.closest('.settings-btn')) {
+                this.closeSettingsDropdown();
+            }
+        });
+    }
+    
+    toggleSettingsDropdown() {
+        let dropdown = document.getElementById('settings-dropdown');
+        if (!dropdown) {
+            this.createSettingsDropdown();
+        } else {
+            if (dropdown.style.display === 'block') {
+                this.closeSettingsDropdown();
+            } else {
+                this.showSettingsDropdown();
+            }
+        }
+    }
+    
+    createSettingsDropdown() {
+        const dropdown = document.createElement('div');
+        dropdown.id = 'settings-dropdown';
+        dropdown.className = 'settings-dropdown';
+        dropdown.style.cssText = `
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 8px;
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(20px);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            min-width: 180px;
+            z-index: 1000;
+            display: none;
+            overflow: hidden;
+        `;
+        
+        dropdown.innerHTML = `
+            <div class="settings-dropdown-item" data-action="profile">
+                <div class="settings-item-icon">👤</div>
+                <div class="settings-item-text">
+                    <div class="settings-item-title">Profile</div>
+                    <div class="settings-item-subtitle">View your profile</div>
+                </div>
+            </div>
+            <div class="settings-dropdown-item" data-action="logout">
+                <div class="settings-item-icon">🚪</div>
+                <div class="settings-item-text">
+                    <div class="settings-item-title">Logout</div>
+                    <div class="settings-item-subtitle">Sign out of your account</div>
+                </div>
+            </div>
+        `;
+        
+        // Add CSS styles for dropdown items
+        const style = document.createElement('style');
+        style.textContent = `
+            .settings-dropdown-item {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 12px 16px;
+                cursor: pointer;
+                transition: background-color 0.2s ease;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            }
+            
+            .settings-dropdown-item:last-child {
+                border-bottom: none;
+            }
+            
+            .settings-dropdown-item:hover {
+                background: rgba(255, 255, 255, 0.1);
+            }
+            
+            .settings-item-icon {
+                font-size: 18px;
+                width: 24px;
+                text-align: center;
+            }
+            
+            .settings-item-text {
+                flex: 1;
+            }
+            
+            .settings-item-title {
+                color: #fff;
+                font-size: 14px;
+                font-weight: 600;
+                margin-bottom: 2px;
+            }
+            
+            .settings-item-subtitle {
+                color: rgba(255, 255, 255, 0.7);
+                font-size: 12px;
+            }
+        `;
+        document.head.appendChild(style);
+        
+        // Position the dropdown relative to the settings button
+        const settingsButton = this.elements.settingsButton;
+        settingsButton.style.position = 'relative';
+        settingsButton.appendChild(dropdown);
+        
+        // Add click handlers for dropdown items
+        dropdown.querySelectorAll('.settings-dropdown-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const action = item.getAttribute('data-action');
+                this.handleSettingsAction(action);
+                this.closeSettingsDropdown();
+            });
+        });
+        
+        this.showSettingsDropdown();
+    }
+    
+    showSettingsDropdown() {
+        const dropdown = document.getElementById('settings-dropdown');
+        if (dropdown) {
+            dropdown.style.display = 'block';
+        }
+    }
+    
+    closeSettingsDropdown() {
+        const dropdown = document.getElementById('settings-dropdown');
+        if (dropdown) {
+            dropdown.style.display = 'none';
+        }
+    }
+    
+    handleSettingsAction(action) {
+        switch (action) {
+            case 'profile':
+                this.showProfileModal();
+                break;
+            case 'logout':
+                this.handleLogout();
+                break;
+            default:
+                console.log('Unknown settings action:', action);
+        }
+    }
+    
+    showProfileModal() {
+        // Create profile modal
+        let profileModal = document.getElementById('profile-modal');
+        if (!profileModal) {
+            profileModal = document.createElement('div');
+            profileModal.id = 'profile-modal';
+            profileModal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                display: none;
+                justify-content: center;
+                align-items: center;
+                z-index: 3000;
+                backdrop-filter: blur(5px);
+                -webkit-backdrop-filter: blur(5px);
+            `;
+            
+            const modalContent = document.createElement('div');
+            modalContent.style.cssText = `
+                background: rgba(255, 255, 255, 0.95);
+                padding: 30px;
+                border-radius: 20px;
+                max-width: 400px;
+                width: 90%;
+                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+                position: relative;
+                text-align: center;
+            `;
+            
+            modalContent.innerHTML = `
+                <h2 style="margin: 0 0 20px 0; color: #1d1d1f; font-size: 24px;">👤 Profile</h2>
+                
+                <div style="margin-bottom: 20px;">
+                    <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%); border-radius: 50%; margin: 0 auto 15px; display: flex; align-items: center; justify-content: center; font-size: 32px; color: white;">
+                        👤
+                    </div>
+                    <h3 id="profileName" style="margin: 0 0 5px 0; color: #1d1d1f; font-size: 18px;">Loading...</h3>
+                    <p id="profileEmail" style="margin: 0; color: #666; font-size: 14px;">Loading...</p>
+                </div>
+                
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
+                    <h4 style="margin: 0 0 15px 0; color: #1d1d1f; font-size: 16px;">📊 Statistics</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div>
+                            <div style="color: #666; font-size: 12px; margin-bottom: 5px;">Level</div>
+                            <div id="profileLevel" style="color: #1d1d1f; font-size: 18px; font-weight: 600;">1</div>
+                        </div>
+                        <div>
+                            <div style="color: #666; font-size: 12px; margin-bottom: 5px;">Coins</div>
+                            <div id="profileCoins" style="color: #1d1d1f; font-size: 18px; font-weight: 600;">0 DZD</div>
+                        </div>
+                        <div>
+                            <div style="color: #666; font-size: 12px; margin-bottom: 5px;">Experience</div>
+                            <div id="profileExp" style="color: #1d1d1f; font-size: 18px; font-weight: 600;">0</div>
+                        </div>
+                        <div>
+                            <div style="color: #666; font-size: 12px; margin-bottom: 5px;">Status</div>
+                            <div style="color: #34C759; font-size: 18px; font-weight: 600;">🟢 Online</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <button id="closeProfileModal" style="
+                    background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
+                    color: white;
+                    border: none;
+                    padding: 12px 24px;
+                    border-radius: 8px;
+                    font-size: 16px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                ">Close</button>
+                
+                <button id="closeProfileModalX" style="
+                    position: absolute;
+                    top: 15px;
+                    right: 15px;
+                    background: none;
+                    border: none;
+                    font-size: 24px;
+                    cursor: pointer;
+                    color: #666;
+                ">×</button>
+            `;
+            
+            modal.appendChild(modalContent);
+            document.body.appendChild(profileModal);
+            
+            // Add event listeners
+            document.getElementById('closeProfileModal').addEventListener('click', () => {
+                profileModal.style.display = 'none';
+            });
+            
+            document.getElementById('closeProfileModalX').addEventListener('click', () => {
+                profileModal.style.display = 'none';
+            });
+            
+            profileModal.addEventListener('click', (e) => {
+                if (e.target === profileModal) {
+                    profileModal.style.display = 'none';
+                }
+            });
+        }
+        
+        // Update profile information
+        if (this.game && this.game.auth && this.game.auth.user) {
+            const user = this.game.auth.user;
+            const stats = this.game.auth.userStats;
+            
+            document.getElementById('profileName').textContent = user.displayName || user.email || 'User';
+            document.getElementById('profileEmail').textContent = user.email || 'No email';
+            document.getElementById('profileLevel').textContent = stats?.level || 1;
+            document.getElementById('profileCoins').textContent = `${stats?.points || 0} DZD`;
+            document.getElementById('profileExp').textContent = stats?.experience || 0;
+        }
+        
+        profileModal.style.display = 'flex';
+    }
+    
+    handleLogout() {
+        if (this.game && this.game.auth) {
+            this.game.auth.logout();
+        }
+    }
+    
+    showSettingsModal() {
+        // Create settings modal
+        let settingsModal = document.getElementById('settings-modal');
+        if (!settingsModal) {
+            settingsModal = document.createElement('div');
+            settingsModal.id = 'settings-modal';
+            settingsModal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                display: none;
+                justify-content: center;
+                align-items: center;
+                z-index: 3000;
+                backdrop-filter: blur(5px);
+                -webkit-backdrop-filter: blur(5px);
+            `;
+            
+            const modalContent = document.createElement('div');
+            modalContent.style.cssText = `
+                background: rgba(255, 255, 255, 0.95);
+                padding: 30px;
+                border-radius: 20px;
+                max-width: 500px;
+                width: 90%;
+                max-height: 80vh;
+                overflow-y: auto;
+                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+                position: relative;
+            `;
+            
+            modalContent.innerHTML = `
+                <h2 style="margin: 0 0 20px 0; color: #1d1d1f; font-size: 24px; text-align: center;">⚙️ Settings</h2>
+                
+                <div style="display: flex; flex-direction: column; gap: 20px;">
+                    <div class="settings-section">
+                        <h3 style="margin: 0 0 15px 0; color: #1d1d1f; font-size: 18px;">🎮 Game Settings</h3>
+                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                                <input type="checkbox" id="debugMode" style="transform: scale(1.2);">
+                                <span>Debug Mode</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                                <input type="checkbox" id="soundEnabled" checked style="transform: scale(1.2);">
+                                <span>Sound Effects</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                                <input type="checkbox" id="musicEnabled" checked style="transform: scale(1.2);">
+                                <span>Background Music</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-section">
+                        <h3 style="margin: 0 0 15px 0; color: #1d1d1f; font-size: 18px;">🎨 Display Settings</h3>
+                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                                <input type="checkbox" id="showFPS" style="transform: scale(1.2);">
+                                <span>Show FPS Counter</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                                <input type="checkbox" id="fullscreen" style="transform: scale(1.2);">
+                                <span>Fullscreen Mode</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-section">
+                        <h3 style="margin: 0 0 15px 0; color: #1d1d1f; font-size: 18px;">📊 Statistics</h3>
+                        <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; border-left: 4px solid #007AFF;">
+                            <p style="margin: 0 0 5px 0; color: #666;">Current Level: <strong id="settingsLevel">1</strong></p>
+                            <p style="margin: 0 0 5px 0; color: #666;">Total Coins: <strong id="settingsCoins">0</strong> DZD</p>
+                            <p style="margin: 0; color: #666;">Experience: <strong id="settingsExp">0</strong></p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 15px; justify-content: center; margin-top: 30px;">
+                    <button id="settingsCancel" style="
+                        background: rgba(255, 59, 48, 0.1);
+                        color: #ff3b30;
+                        border: 2px solid rgba(255, 59, 48, 0.3);
+                        padding: 12px 24px;
+                        border-radius: 8px;
+                        font-size: 16px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                    ">Cancel</button>
+                    <button id="settingsSave" style="
+                        background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
+                        color: white;
+                        border: none;
+                        padding: 12px 24px;
+                        border-radius: 8px;
+                        font-size: 16px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                    ">Save Settings</button>
+                </div>
+                
+                <button id="closeSettingsModal" style="
+                    position: absolute;
+                    top: 15px;
+                    right: 15px;
+                    background: none;
+                    border: none;
+                    font-size: 24px;
+                    cursor: pointer;
+                    color: #666;
+                ">×</button>
+            `;
+            
+            modal.appendChild(modalContent);
+            document.body.appendChild(settingsModal);
+            
+            // Add event listeners
+            document.getElementById('closeSettingsModal').addEventListener('click', () => {
+                settingsModal.style.display = 'none';
+            });
+            
+            document.getElementById('settingsCancel').addEventListener('click', () => {
+                settingsModal.style.display = 'none';
+            });
+            
+            document.getElementById('settingsSave').addEventListener('click', () => {
+                this.saveSettings();
+                settingsModal.style.display = 'none';
+                this.game.auth.showBottomNotification('✅ Settings saved!', 'success');
+            });
+            
+            settingsModal.addEventListener('click', (e) => {
+                if (e.target === settingsModal) {
+                    settingsModal.style.display = 'none';
+                }
+            });
+        }
+        
+        // Update statistics in modal
+        if (this.game && this.game.auth && this.game.auth.userStats) {
+            const stats = this.game.auth.userStats;
+            const levelEl = document.getElementById('settingsLevel');
+            const coinsEl = document.getElementById('settingsCoins');
+            const expEl = document.getElementById('settingsExp');
+            
+            if (levelEl) levelEl.textContent = stats.level || 1;
+            if (coinsEl) coinsEl.textContent = stats.points || 0;
+            if (expEl) expEl.textContent = stats.experience || 0;
+        }
+        
+        settingsModal.style.display = 'flex';
+    }
+    
+    saveSettings() {
+        // Get settings values
+        const debugMode = document.getElementById('debugMode').checked;
+        const soundEnabled = document.getElementById('soundEnabled').checked;
+        const musicEnabled = document.getElementById('musicEnabled').checked;
+        const showFPS = document.getElementById('showFPS').checked;
+        const fullscreen = document.getElementById('fullscreen').checked;
+        
+        // Save to localStorage
+        const settings = {
+            debugMode,
+            soundEnabled,
+            musicEnabled,
+            showFPS,
+            fullscreen
+        };
+        
+        localStorage.setItem('gameSettings', JSON.stringify(settings));
+        
+        // Apply settings
+        if (this.game) {
+            this.game.debugMode = debugMode;
+        }
+        
+        console.log('⚙️ Settings saved:', settings);
     }
     
     showLogin() {
@@ -4155,8 +4636,10 @@ class HouseInteractionManager {
             this.createInteractionButton();
         }
         
-        // Update button text
-        this.interactionButton.innerHTML = `🏠 Enter ${house.name}`;
+        // Update button text with proper house name from JSON
+        const houseData = this.getHouseDataFromJSON(house.layerNumber);
+        const houseName = houseData ? houseData.name : house.name;
+        this.interactionButton.innerHTML = `🏠 Enter ${houseName}`;
         
         // Show button with slide-up animation
         this.interactionButton.style.display = 'block';
@@ -4195,6 +4678,10 @@ class HouseInteractionManager {
     }
     
     showHouseModal(house) {
+        // Get house data and name FIRST
+        const houseData = this.getHouseDataFromJSON(house.layerNumber);
+        const houseName = houseData ? houseData.name : house.name;
+        
         // Create modal if it doesn't exist
         let modal = document.getElementById('house-modal');
         if (!modal) {
@@ -4230,9 +4717,9 @@ class HouseInteractionManager {
             `;
             
             modalContent.innerHTML = `
-                <h2 style="margin: 0 0 20px 0; color: #1d1d1f; font-size: 24px;">${house.name}</h2>
+                <h2 style="margin: 0 0 20px 0; color: #1d1d1f; font-size: 24px;">${houseName}</h2>
                 <p style="margin: 0 0 30px 0; color: #666; font-size: 16px;">
-                    Welcome to ${house.name}! What would you like to do?
+                    Welcome to ${houseName}! What would you like to do?
                 </p>
                 <div class="house-actions-container" style="display: flex; flex-direction: column; gap: 15px;">
                     ${this.getHouseActions(house)}
@@ -4294,33 +4781,100 @@ class HouseInteractionManager {
             });
         }
         
-        // Update house name in modal
-        modal.querySelector('h2').textContent = house.name;
-        modal.querySelector('p').textContent = `Welcome to ${house.name}! What would you like to do?`;
+        // House name is already set in the template above
+        
+        // Update the house actions container with new buttons
+        const actionsContainer = modal.querySelector('.house-actions-container');
+        if (actionsContainer) {
+            actionsContainer.innerHTML = this.getHouseActions(house);
+            
+            // Reattach event listeners to new buttons
+            actionsContainer.querySelectorAll('.house-action-btn').forEach(btn => {
+                btn.style.cssText = `
+                    background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
+                    color: white;
+                    border: none;
+                    padding: 12px 20px;
+                    border-radius: 12px;
+                    font-size: 16px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                `;
+                
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const action = e.target.getAttribute('data-action');
+                    const buttonIndex = e.target.getAttribute('data-section-index');
+                    console.log('Button clicked:', { action, buttonIndex, house: house.layerNumber });
+                    this.handleHouseAction(action, house, buttonIndex);
+                });
+                
+                btn.addEventListener('mouseenter', () => {
+                    btn.style.transform = 'translateY(-2px)';
+                    btn.style.boxShadow = '0 4px 15px rgba(0, 122, 255, 0.3)';
+                });
+                
+                btn.addEventListener('mouseleave', () => {
+                    btn.style.transform = 'translateY(0)';
+                    btn.style.boxShadow = 'none';
+                });
+            });
+        }
         
         modal.style.display = 'flex';
     }
     
     getHouseActions(house) {
-        const houseNumber = house.layerNumber.toString();
-        const config = this.houseButtonConfig[houseNumber];
+        // Get house data from JSON structure
+        const houseData = this.getHouseDataFromJSON(house.layerNumber);
         
-        if (!config || !config.buttons || config.buttons.length === 0) {
-            // Fallback to default actions
+        if (!houseData) {
             return this.getDefaultHouseActions(house);
         }
         
-        // Generate buttons from CSV configuration
-        return config.buttons.map((button, index) => {
-            const buttonId = `house-btn-${houseNumber}-${index}`;
-            return `
+        // Generate specific buttons based on house structure
+        let buttons = '';
+        
+        if (houseData.sections && houseData.sections.length > 0) {
+            // House has sections - show section buttons
+            buttons = houseData.sections.map((section, index) => {
+                let buttonText = section.name;
+                let buttonIcon = '';
+                
+                // Add icons based on section type
+                if (section.type === 'readonly') {
+                    buttonIcon = '📊 ';
+                } else if (section.conditionalGroups) {
+                    buttonIcon = '⚙️ ';
+                } else if (section.fields) {
+                    buttonIcon = '📝 ';
+                }
+                
+                return `
+                    <div class="house-button-container">
+                        <button class="house-action-btn" data-action="section" data-house="${house.layerNumber}" data-section-index="${index}">
+                            ${buttonIcon}${buttonText}
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        } else if (houseData.fields && houseData.fields.length > 0) {
+            // House has direct fields - show main form button
+            buttons = `
                 <div class="house-button-container">
-                    <button class="house-action-btn" data-action="${button.name.toLowerCase().replace(/\s+/g, '-')}" data-house="${houseNumber}" data-button-index="${index}">
-                        ${button.name}
+                    <button class="house-action-btn" data-action="house-form" data-house="${house.layerNumber}">
+                        📝 Fill Form
                     </button>
                 </div>
             `;
-        }).join('');
+        } else {
+            // Fallback to default actions
+            buttons = this.getDefaultHouseActions(house);
+        }
+        
+        return buttons;
     }
     
     getDefaultHouseActions(house) {
@@ -4331,17 +4885,243 @@ class HouseInteractionManager {
         `;
     }
     
+    getHouseDataFromJSON(houseNumber) {
+        // House data mapping based on the JSON structure - REARRANGED for correct visual positions
+        // Top of screen (Y=1090) = Mission Planning, Bottom of screen (Y=256) = Login
+        const houseDataMap = {
+            // REARRANGED for correct visual positions (Y-axis corrected)
+            // Top of screen (Y=1090) = Mission Planning, Bottom of screen (Y=256) = Login
+            1: { id: 8, name: "Mission Planning", fields: [{ label: "Missions", type: "table", columns: ["Mission 1", "Mission 2", "Mission 3", "..."] }] },
+            2: { 
+                id: 7, 
+                name: "Feedback & Tasks", 
+                sections: [
+                    {
+                        name: "Tasks",
+                        type: "readonly",
+                        description: "Read-only view"
+                    },
+                    {
+                        name: "Feedback",
+                        type: "readonly",
+                        description: "Read-only view"
+                    },
+                    {
+                        name: "Customer Satisfaction",
+                        type: "readonly",
+                        description: "Read-only view"
+                    }
+                ]
+            },
+            3: { 
+                id: 6, 
+                name: "Media & Statistics", 
+                sections: [
+                    {
+                        name: "Photo / Video",
+                        fields: [
+                            { label: "Training", type: "text" },
+                            { label: "Group", type: "text" },
+                            { label: "Date", type: "date" }
+                        ]
+                    },
+                    {
+                        name: "Defense (Final Project)",
+                        fields: [
+                            { label: "Training", type: "text" },
+                            { label: "Group", type: "text" }
+                        ]
+                    },
+                    {
+                        name: "Payment Report",
+                        fields: [
+                            { label: "Training", type: "text" },
+                            { label: "Group", type: "text" },
+                            { label: "Payment %", type: "number" }
+                        ]
+                    },
+                    {
+                        name: "Attendance Report",
+                        fields: [
+                            { label: "Training", type: "text" },
+                            { label: "Group", type: "text" },
+                            { label: "Attendance %", type: "number" }
+                        ]
+                    },
+                    {
+                        name: "Student Count",
+                        fields: [
+                            { label: "Training", type: "text" },
+                            { label: "Group", type: "text" },
+                            { label: "Number", type: "number" }
+                        ]
+                    }
+                ]
+            },
+            4: { 
+                id: 5, 
+                name: "Administrative Data", 
+                sections: [
+                    {
+                        name: "Diploma",
+                        fields: [
+                            { label: "First Name", type: "text" },
+                            { label: "Last Name", type: "text" },
+                            { label: "Phone Number", type: "text" },
+                            { label: "Training", type: "text" }
+                        ]
+                    },
+                    {
+                        name: "Registration Form",
+                        fields: [
+                            { label: "First Name", type: "text" },
+                            { label: "Last Name", type: "text" },
+                            { label: "Phone Number", type: "text" },
+                            { label: "Training", type: "text" }
+                        ]
+                    },
+                    {
+                        name: "Pre-Registration",
+                        fields: [
+                            { label: "First Name", type: "text" },
+                            { label: "Last Name", type: "text" },
+                            { label: "Phone Number", type: "text" },
+                            { label: "Training", type: "text" },
+                            { label: "Province", type: "text" },
+                            { label: "District", type: "text" },
+                            { label: "Facebook", type: "text" }
+                        ]
+                    },
+                    {
+                        name: "Cash Register",
+                        fields: [
+                            { label: "Cash Fund", type: "number" },
+                            { label: "Vouchers", type: "number" },
+                            { label: "Expenses", type: "number" }
+                        ]
+                    }
+                ]
+            },
+            5: { 
+                id: 4, 
+                name: "Time Tracking", 
+                fields: [
+                    { label: "Arrival Time", type: "time" },
+                    { label: "Departure Time", type: "time" },
+                    { label: "Comments", type: "textarea" }
+                ]
+            },
+            6: { 
+                id: 3, 
+                name: "Analytics & History", 
+                sections: [
+                    {
+                        name: "Improvement Ideas",
+                        fields: [
+                            { label: "Titles", type: "text" },
+                            { label: "Details", type: "textarea" }
+                        ]
+                    },
+                    {
+                        name: "Other Players' Missions",
+                        type: "readonly",
+                        description: "Displays other players' missions based on player name"
+                    },
+                    {
+                        name: "Leaderboard",
+                        type: "readonly",
+                        description: "Displays the current ranking"
+                    },
+                    {
+                        name: "Coin History",
+                        type: "readonly",
+                        description: "Displays coin history by calendar date"
+                    }
+                ]
+            },
+            7: { 
+                id: 2, 
+                name: "Seminar Management", 
+                sections: [
+                    {
+                        name: "Seminar Info",
+                        fields: [
+                            { label: "Titles", type: "text" },
+                            { label: "Start Time", type: "time" },
+                            { label: "End Time", type: "time" },
+                            { label: "Number of Participants", type: "number" },
+                            { label: "Number of Certificates", type: "number" }
+                        ]
+                    },
+                    {
+                        name: "Phone Info",
+                        fields: [
+                            { label: "Training", type: "text" },
+                            { label: "Group", type: "text" },
+                            { label: "Session", type: "select", options: ["1st", "2nd", "3rd", "..."] }
+                        ]
+                    },
+                    {
+                        name: "Entry Type",
+                        conditionalGroups: [
+                            {
+                                condition: "voucher",
+                                fields: [
+                                    { label: "Remaining Vouchers", type: "number" },
+                                    { label: "Vouchers Entered", type: "number" }
+                                ]
+                            },
+                            {
+                                condition: "registration_form",
+                                fields: [
+                                    { label: "Remaining Forms", type: "number" },
+                                    { label: "Forms Entered", type: "number" }
+                                ]
+                            },
+                            {
+                                condition: "diploma",
+                                fields: [
+                                    { label: "Remaining Diplomas", type: "number" },
+                                    { label: "Diplomas Entered", type: "number" }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        name: "Hygiene",
+                        fields: [
+                            { label: "District", type: "text" },
+                            { label: "Province", type: "text" },
+                            { label: "Completed by", type: "text" },
+                            { label: "Percentage", type: "number" }
+                        ]
+                    }
+                ]
+            },
+            8: { id: 1, name: "Login", fields: [{ label: "Password", type: "password" }] }
+        };
+        
+        return houseDataMap[houseNumber];
+    }
+    
     handleHouseAction(action, house, buttonIndex) {
+        console.log('handleHouseAction called:', { action, house: house.layerNumber, buttonIndex });
+        
         const modal = document.getElementById('house-modal');
         modal.style.display = 'none';
         
-        const houseNumber = house.layerNumber.toString();
-        const config = this.houseButtonConfig[houseNumber];
+        // Get house data to determine specific button content
+        const houseData = this.getHouseDataFromJSON(house.layerNumber);
         
-        if (config && config.buttons && config.buttons[buttonIndex]) {
-            const button = config.buttons[buttonIndex];
-            this.showButtonForm(house, button);
+        if (action === 'house-form') {
+            console.log('Opening house dedicated form for house:', house.layerNumber);
+            this.showHouseDedicatedForm(house);
+        } else if (action === 'section') {
+            const sectionIndex = parseInt(buttonIndex);
+            console.log('Opening section form for house:', house.layerNumber, 'section:', sectionIndex);
+            this.showSpecificSectionContent(house, sectionIndex);
         } else {
+            console.log('Unknown action:', action);
             this.game.auth.showBottomNotification('🔍 Exploring...', 'info');
         }
     }
@@ -4503,6 +5283,1260 @@ class HouseInteractionManager {
         
         // Here you can add logic to save the data to Firebase or handle it as needed
         // For now, we just log it and show a success message
+    }
+    
+    showSectionForm(house, sectionIndex) {
+        console.log('showSectionForm called:', { house: house.layerNumber, sectionIndex });
+        
+        const houseData = this.getHouseDataFromJSON(house.layerNumber);
+        if (!houseData || !houseData.sections || !houseData.sections[sectionIndex]) {
+            console.log('Section not found:', { houseData, sections: houseData?.sections, sectionIndex });
+            this.game.auth.showBottomNotification('❌ Section not found', 'error');
+            return;
+        }
+        
+        const section = houseData.sections[sectionIndex];
+        
+        // Handle readonly sections
+        if (section.type === 'readonly') {
+            this.showReadonlySection(house, section);
+            return;
+        }
+        
+        // Handle conditional groups (like Entry Type)
+        if (section.conditionalGroups) {
+            this.showConditionalSection(house, section);
+            return;
+        }
+        
+        // Handle regular sections with fields
+        if (section.fields && section.fields.length > 0) {
+            this.showFieldForm(house, section);
+            return;
+        }
+        
+        this.game.auth.showBottomNotification('❌ No form available for this section', 'error');
+    }
+    
+    showSpecificSectionContent(house, sectionIndex) {
+        console.log('showSpecificSectionContent called:', { house: house.layerNumber, sectionIndex });
+        
+        const houseData = this.getHouseDataFromJSON(house.layerNumber);
+        if (!houseData || !houseData.sections || !houseData.sections[sectionIndex]) {
+            console.log('Section not found:', { houseData, sections: houseData?.sections, sectionIndex });
+            this.game.auth.showBottomNotification('❌ Section not found', 'error');
+            return;
+        }
+        
+        const section = houseData.sections[sectionIndex];
+        const houseName = houseData.name;
+        const sectionName = section.name;
+        
+        // Create unique modal for this specific section
+        let sectionModal = document.getElementById(`section-modal-${house.layerNumber}-${sectionIndex}`);
+        if (!sectionModal) {
+            sectionModal = document.createElement('div');
+            sectionModal.id = `section-modal-${house.layerNumber}-${sectionIndex}`;
+            sectionModal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                display: none;
+                justify-content: center;
+                align-items: center;
+                z-index: 3000;
+                backdrop-filter: blur(5px);
+                -webkit-backdrop-filter: blur(5px);
+            `;
+            document.body.appendChild(sectionModal);
+        }
+        
+        const sectionContent = document.createElement('div');
+        sectionContent.style.cssText = `
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 20px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        `;
+        
+        // Generate specific content based on section type
+        let contentHTML = '';
+        
+        if (section.type === 'readonly') {
+            contentHTML = this.createReadonlySectionContent(section, houseName);
+        } else if (section.conditionalGroups) {
+            contentHTML = this.createConditionalSectionContent(section, houseName);
+        } else if (section.fields) {
+            contentHTML = this.createFieldSectionContent(section, houseName);
+        } else {
+            contentHTML = `<div style="text-align: center; color: #666;">No content available for this section.</div>`;
+        }
+        
+        sectionContent.innerHTML = `
+            <h2 style="margin: 0 0 20px 0; color: #1d1d1f; font-size: 24px; text-align: center;">
+                ${houseName} - ${sectionName}
+            </h2>
+            <p style="margin: 0 0 30px 0; color: #666; font-size: 16px; text-align: center;">
+                ${this.getSectionDescription(section)}
+            </p>
+            <div class="section-content">
+                ${contentHTML}
+            </div>
+            <div style="display: flex; justify-content: center; margin-top: 30px;">
+                <button id="close-section-${house.layerNumber}-${sectionIndex}" style="
+                    background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
+                    color: white;
+                    border: none;
+                    padding: 12px 24px;
+                    border-radius: 12px;
+                    font-size: 16px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                ">Close</button>
+            </div>
+        `;
+        
+        sectionModal.innerHTML = '';
+        sectionModal.appendChild(sectionContent);
+        sectionModal.style.display = 'flex';
+        
+        // Add event listeners
+        document.getElementById(`close-section-${house.layerNumber}-${sectionIndex}`).addEventListener('click', () => {
+            sectionModal.style.display = 'none';
+        });
+        
+        sectionModal.addEventListener('click', (e) => {
+            if (e.target === sectionModal) {
+                sectionModal.style.display = 'none';
+            }
+        });
+        
+        // Add input focus effects for any form elements
+        sectionContent.querySelectorAll('input, select, textarea').forEach(input => {
+            input.addEventListener('focus', () => {
+                input.style.borderColor = '#007AFF';
+            });
+            input.addEventListener('blur', () => {
+                input.style.borderColor = '#e1e5e9';
+            });
+        });
+        
+        console.log('Section modal created for:', { house: houseName, section: sectionName });
+    }
+    
+    createReadonlySectionContent(section, houseName) {
+        return `
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 12px; border-left: 4px solid #8E8E93;">
+                <h3 style="margin: 0 0 15px 0; color: #1d1d1f;">${section.name}</h3>
+                <p style="margin: 0 0 20px 0; color: #666;">${section.description}</p>
+                
+                <div style="overflow-x: auto; margin-bottom: 20px;">
+                    <table style="width: 100%; border-collapse: collapse; border: 1px solid #e1e5e9; border-radius: 8px; overflow: hidden; background: white;">
+                        <thead>
+                            <tr style="background: #8E8E93; color: white;">
+                                <th style="padding: 12px; border: 1px solid #e1e5e9; text-align: left; font-weight: 600;">Data Type</th>
+                                <th style="padding: 12px; border: 1px solid #e1e5e9; text-align: left; font-weight: 600;">Information</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="padding: 12px; border: 1px solid #e1e5e9; background: #f8f9fa; font-weight: 600; width: 30%;">Status</td>
+                                <td style="padding: 12px; border: 1px solid #e1e5e9; background: white; color: #999; font-style: italic;">
+                                    📊 Data will be displayed here when available
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 12px; border: 1px solid #e1e5e9; background: #f8f9fa; font-weight: 600;">Last Updated</td>
+                                <td style="padding: 12px; border: 1px solid #e1e5e9; background: white; color: #999; font-style: italic;">
+                                    No data available
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 12px; border: 1px solid #e1e5e9; background: #f8f9fa; font-weight: 600;">Records</td>
+                                <td style="padding: 12px; border: 1px solid #e1e5e9; background: white; color: #999; font-style: italic;">
+                                    0 entries
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div style="text-align: center; margin-top: 20px;">
+                    <button style="
+                        background: linear-gradient(135deg, #8E8E93 0%, #6D6D70 100%);
+                        color: white;
+                        border: none;
+                        padding: 12px 24px;
+                        border-radius: 8px;
+                        font-size: 16px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                    ">Refresh Data</button>
+                </div>
+            </div>
+        `;
+    }
+    
+    createConditionalSectionContent(section, houseName) {
+        const conditionOptions = section.conditionalGroups.map(group => 
+            `<option value="${group.condition}">${group.condition.replace('_', ' ').toUpperCase()}</option>`
+        ).join('');
+        
+        return `
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 12px; border-left: 4px solid #FF9500;">
+                <h3 style="margin: 0 0 15px 0; color: #1d1d1f;">${section.name}</h3>
+                <p style="margin: 0 0 20px 0; color: #666;">Select the entry type and fill in the required information:</p>
+                
+                <form id="conditional-form-${section.name.replace(/\s+/g, '-')}" style="display: flex; flex-direction: column; gap: 15px;">
+                    <div style="overflow-x: auto; margin-bottom: 20px;">
+                        <table style="width: 100%; border-collapse: collapse; border: 1px solid #e1e5e9; border-radius: 8px; overflow: hidden; background: white;">
+                            <thead>
+                                <tr style="background: #FF9500; color: white;">
+                                    <th style="padding: 12px; border: 1px solid #e1e5e9; text-align: left; font-weight: 600;">Entry Type</th>
+                                    <th style="padding: 12px; border: 1px solid #e1e5e9; text-align: left; font-weight: 600;">Selection</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="padding: 12px; border: 1px solid #e1e5e9; background: #f8f9fa; font-weight: 600; width: 30%;">Entry Type</td>
+                                    <td style="padding: 8px; border: 1px solid #e1e5e9; background: white;">
+                                        <select id="entry-type-${section.name.replace(/\s+/g, '-')}" name="entry-type" style="
+                                            width: 100%;
+                                            padding: 8px;
+                                            border: 1px solid #e1e5e9;
+                                            border-radius: 4px;
+                                            font-size: 14px;
+                                            box-sizing: border-box;
+                                            transition: border-color 0.3s ease;
+                                        ">
+                                            <option value="">Select Entry Type</option>
+                                            ${conditionOptions}
+                                        </select>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div id="conditional-fields-${section.name.replace(/\s+/g, '-')}" style="display: none;">
+                        <!-- Dynamic fields table will be added here -->
+                    </div>
+                    
+                    <div style="display: flex; gap: 15px; justify-content: center; margin-top: 20px;">
+                        <button type="button" id="cancel-conditional-${section.name.replace(/\s+/g, '-')}" style="
+                            background: rgba(255, 59, 48, 0.1);
+                            color: #ff3b30;
+                            border: 2px solid rgba(255, 59, 48, 0.3);
+                            padding: 12px 24px;
+                            border-radius: 8px;
+                            font-size: 16px;
+                            font-weight: 600;
+                            cursor: pointer;
+                            transition: all 0.3s ease;
+                        ">Cancel</button>
+                        <button type="submit" style="
+                            background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
+                            color: white;
+                            border: none;
+                            padding: 12px 24px;
+                            border-radius: 8px;
+                            font-size: 16px;
+                            font-weight: 600;
+                            cursor: pointer;
+                            transition: all 0.3s ease;
+                        ">Submit Data</button>
+                    </div>
+                </form>
+            </div>
+        `;
+    }
+    
+    createFieldSectionContent(section, houseName) {
+        // Create a table-based form for this section
+        const tableRows = section.fields.map((field, index) => {
+            const fieldId = `field-${index}`;
+            const baseInputStyle = `
+                width: 100%;
+                padding: 8px;
+                border: 1px solid #e1e5e9;
+                border-radius: 4px;
+                font-size: 14px;
+                box-sizing: border-box;
+                transition: border-color 0.3s ease;
+            `;
+            
+            let inputElement = '';
+            
+            switch (field.type) {
+                case 'password':
+                    inputElement = `<input type="password" id="${fieldId}" name="${fieldId}" placeholder="Enter ${field.label}" style="${baseInputStyle}">`;
+                    break;
+                case 'time':
+                    inputElement = `<input type="time" id="${fieldId}" name="${fieldId}" style="${baseInputStyle}">`;
+                    break;
+                case 'date':
+                    inputElement = `<input type="date" id="${fieldId}" name="${fieldId}" style="${baseInputStyle}">`;
+                    break;
+                case 'number':
+                    inputElement = `<input type="number" id="${fieldId}" name="${fieldId}" placeholder="Enter ${field.label}" style="${baseInputStyle}">`;
+                    break;
+                case 'select':
+                    const options = field.options ? field.options.map(option => `<option value="${option}">${option}</option>`).join('') : '';
+                    inputElement = `<select id="${fieldId}" name="${fieldId}" style="${baseInputStyle}"><option value="">Select ${field.label}</option>${options}</select>`;
+                    break;
+                case 'textarea':
+                    inputElement = `<textarea id="${fieldId}" name="${fieldId}" placeholder="Enter ${field.label}" rows="2" style="${baseInputStyle}"></textarea>`;
+                    break;
+                default:
+                    inputElement = `<input type="text" id="${fieldId}" name="${fieldId}" placeholder="Enter ${field.label}" style="${baseInputStyle}">`;
+            }
+            
+            return `
+                <tr>
+                    <td style="padding: 12px; border: 1px solid #e1e5e9; background: #f8f9fa; font-weight: 600; width: 30%;">${field.label}</td>
+                    <td style="padding: 8px; border: 1px solid #e1e5e9; background: white;">${inputElement}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        return `
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 12px; border-left: 4px solid #007AFF;">
+                <h3 style="margin: 0 0 15px 0; color: #1d1d1f;">${section.name}</h3>
+                <p style="margin: 0 0 20px 0; color: #666;">Fill in the required information in the table below:</p>
+                
+                <div style="overflow-x: auto; margin-bottom: 20px;">
+                    <table style="width: 100%; border-collapse: collapse; border: 1px solid #e1e5e9; border-radius: 8px; overflow: hidden; background: white;">
+                        <thead>
+                            <tr style="background: #007AFF; color: white;">
+                                <th style="padding: 12px; border: 1px solid #e1e5e9; text-align: left; font-weight: 600;">Field</th>
+                                <th style="padding: 12px; border: 1px solid #e1e5e9; text-align: left; font-weight: 600;">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${tableRows}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <form id="section-form-${section.name.replace(/\s+/g, '-')}" style="display: flex; flex-direction: column; gap: 15px;">
+                    <div style="display: flex; gap: 15px; justify-content: center;">
+                        <button type="button" id="cancel-section-${section.name.replace(/\s+/g, '-')}" style="
+                            background: rgba(255, 59, 48, 0.1);
+                            color: #ff3b30;
+                            border: 2px solid rgba(255, 59, 48, 0.3);
+                            padding: 12px 24px;
+                            border-radius: 8px;
+                            font-size: 16px;
+                            font-weight: 600;
+                            cursor: pointer;
+                            transition: all 0.3s ease;
+                        ">Cancel</button>
+                        <button type="submit" style="
+                            background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
+                            color: white;
+                            border: none;
+                            padding: 12px 24px;
+                            border-radius: 8px;
+                            font-size: 16px;
+                            font-weight: 600;
+                            cursor: pointer;
+                            transition: all 0.3s ease;
+                        ">Submit Data</button>
+                    </div>
+                </form>
+            </div>
+        `;
+    }
+    
+    getSectionDescription(section) {
+        if (section.type === 'readonly') {
+            return 'This is a read-only section for viewing data.';
+        } else if (section.conditionalGroups) {
+            return 'Select an entry type and fill in the corresponding fields.';
+        } else if (section.fields) {
+            return 'Fill in the required information for this section.';
+        } else {
+            return 'Access the content for this section.';
+        }
+    }
+    
+    createSectionedHouseTableForm(houseData) {
+        // Create a comprehensive table form with all sections
+        let allFields = [];
+        
+        houseData.sections.forEach((section, sectionIndex) => {
+            if (section.type === 'readonly') {
+                // Add readonly section info
+                allFields.push({
+                    type: 'readonly-info',
+                    sectionName: section.name,
+                    description: section.description
+                });
+            } else if (section.conditionalGroups) {
+                // Add conditional section
+                allFields.push({
+                    type: 'conditional-section',
+                    sectionName: section.name,
+                    conditionalGroups: section.conditionalGroups
+                });
+            } else if (section.fields) {
+                // Add regular fields with section header
+                allFields.push({
+                    type: 'section-header',
+                    sectionName: section.name
+                });
+                section.fields.forEach(field => {
+                    allFields.push(field);
+                });
+            }
+        });
+        
+        return allFields.map((field, index) => {
+            if (field.type === 'readonly-info') {
+                return `
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 10px 0; border-left: 4px solid #8E8E93;">
+                        <h4 style="margin: 0 0 5px 0; color: #1d1d1f;">${field.sectionName}</h4>
+                        <p style="margin: 0; color: #666; font-size: 14px;">${field.description}</p>
+                    </div>
+                `;
+            } else if (field.type === 'conditional-section') {
+                return this.createConditionalSectionContent(field, index);
+            } else if (field.type === 'section-header') {
+                return `
+                    <div style="background: #007AFF; color: white; padding: 10px 15px; border-radius: 8px; margin: 15px 0 10px 0; font-weight: 600;">
+                        ${field.sectionName}
+                    </div>
+                `;
+            } else {
+                return this.createTableRowField(field, index);
+            }
+        }).join('');
+    }
+    
+    createDirectHouseTableForm(houseData) {
+        const tableRows = houseData.fields.map((field, index) => {
+            return this.createTableRowField(field, index);
+        }).join('');
+        
+        return `
+            <div style="overflow-x: auto; margin-bottom: 20px;">
+                <table style="width: 100%; border-collapse: collapse; border: 1px solid #e1e5e9; border-radius: 8px; overflow: hidden; background: white;">
+                    <thead>
+                        <tr style="background: #007AFF; color: white;">
+                            <th style="padding: 12px; border: 1px solid #e1e5e9; text-align: left; font-weight: 600;">Field</th>
+                            <th style="padding: 12px; border: 1px solid #e1e5e9; text-align: left; font-weight: 600;">Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tableRows}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+    
+    createTableRowField(field, index) {
+        const fieldId = `field-${index}`;
+        const baseInputStyle = `
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #e1e5e9;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+            transition: border-color 0.3s ease;
+        `;
+        
+        let inputElement = '';
+        
+        switch (field.type) {
+            case 'password':
+                inputElement = `<input type="password" id="${fieldId}" name="${fieldId}" placeholder="Enter ${field.label}" style="${baseInputStyle}">`;
+                break;
+            case 'time':
+                inputElement = `<input type="time" id="${fieldId}" name="${fieldId}" style="${baseInputStyle}">`;
+                break;
+            case 'date':
+                inputElement = `<input type="date" id="${fieldId}" name="${fieldId}" style="${baseInputStyle}">`;
+                break;
+            case 'number':
+                inputElement = `<input type="number" id="${fieldId}" name="${fieldId}" placeholder="Enter ${field.label}" style="${baseInputStyle}">`;
+                break;
+            case 'select':
+                const options = field.options ? field.options.map(option => `<option value="${option}">${option}</option>`).join('') : '';
+                inputElement = `<select id="${fieldId}" name="${fieldId}" style="${baseInputStyle}"><option value="">Select ${field.label}</option>${options}</select>`;
+                break;
+            case 'textarea':
+                inputElement = `<textarea id="${fieldId}" name="${fieldId}" placeholder="Enter ${field.label}" rows="2" style="${baseInputStyle}"></textarea>`;
+                break;
+            case 'table':
+                // Handle table type (for Mission Planning)
+                inputElement = this.createTableField(field, fieldId);
+                break;
+            default:
+                inputElement = `<input type="text" id="${fieldId}" name="${fieldId}" placeholder="Enter ${field.label}" style="${baseInputStyle}">`;
+        }
+        
+        return `
+            <tr>
+                <td style="padding: 12px; border: 1px solid #e1e5e9; background: #f8f9fa; font-weight: 600; width: 30%;">${field.label}</td>
+                <td style="padding: 8px; border: 1px solid #e1e5e9; background: white;">${inputElement}</td>
+            </tr>
+        `;
+    }
+    
+    showHouseDedicatedForm(house) {
+        console.log('showHouseDedicatedForm called:', { house: house.layerNumber });
+        
+        const houseData = this.getHouseDataFromJSON(house.layerNumber);
+        if (!houseData) {
+            console.log('House data not found for house:', house.layerNumber);
+            this.game.auth.showBottomNotification('❌ House data not found', 'error');
+            return;
+        }
+        
+        // Create dedicated form modal for this specific house
+        let formModal = document.getElementById('house-dedicated-form-modal');
+        if (!formModal) {
+            formModal = document.createElement('div');
+            formModal.id = 'house-dedicated-form-modal';
+            formModal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                display: none;
+                justify-content: center;
+                align-items: center;
+                z-index: 3000;
+                backdrop-filter: blur(5px);
+                -webkit-backdrop-filter: blur(5px);
+            `;
+            document.body.appendChild(formModal);
+        }
+        
+        const formContent = document.createElement('div');
+        formContent.style.cssText = `
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 20px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        `;
+        
+        // Generate form content based on house structure
+        let formHTML = '';
+        
+        if (houseData.sections && houseData.sections.length > 0) {
+            // House has sections - create combined table form
+            formHTML = this.createSectionedHouseTableForm(houseData);
+        } else if (houseData.fields && houseData.fields.length > 0) {
+            // House has direct fields - create simple table form
+            formHTML = this.createDirectHouseTableForm(houseData);
+        } else {
+            formHTML = '<div style="text-align: center; color: #666;">No form available for this house.</div>';
+        }
+        
+        formContent.innerHTML = `
+            <h2 style="margin: 0 0 20px 0; color: #1d1d1f; font-size: 24px; text-align: center;">
+                ${houseData.name}
+            </h2>
+            <p style="margin: 0 0 30px 0; color: #666; font-size: 16px; text-align: center;">
+                Fill in the required information:
+            </p>
+            <form id="house-dedicated-form" style="display: flex; flex-direction: column; gap: 20px;">
+                ${formHTML}
+                <div style="display: flex; gap: 15px; justify-content: center; margin-top: 30px;">
+                    <button type="button" id="cancel-house-form" style="
+                        background: rgba(255, 59, 48, 0.1);
+                        color: #ff3b30;
+                        border: 2px solid rgba(255, 59, 48, 0.3);
+                        padding: 12px 24px;
+                        border-radius: 12px;
+                        font-size: 16px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                    ">Cancel</button>
+                    <button type="submit" style="
+                        background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
+                        color: white;
+                        border: none;
+                        padding: 12px 24px;
+                        border-radius: 12px;
+                        font-size: 16px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                    ">Submit</button>
+                </div>
+            </form>
+            <button id="close-house-form-modal" style="
+                position: absolute;
+                top: 15px;
+                right: 15px;
+                background: none;
+                border: none;
+                font-size: 24px;
+                cursor: pointer;
+                color: #666;
+            ">×</button>
+        `;
+        
+        formModal.innerHTML = '';
+        formModal.appendChild(formContent);
+        formModal.style.display = 'flex';
+        
+        // Add event listeners
+        document.getElementById('cancel-house-form').addEventListener('click', () => {
+            formModal.style.display = 'none';
+        });
+        
+        document.getElementById('close-house-form-modal').addEventListener('click', () => {
+            formModal.style.display = 'none';
+        });
+        
+        formModal.addEventListener('click', (e) => {
+            if (e.target === formModal) {
+                formModal.style.display = 'none';
+            }
+        });
+        
+        document.getElementById('house-dedicated-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.handleHouseDedicatedFormSubmission(house, houseData, formModal);
+        });
+        
+        // Add input focus effects
+        formContent.querySelectorAll('input, select, textarea').forEach(input => {
+            input.addEventListener('focus', () => {
+                input.style.borderColor = '#007AFF';
+            });
+            input.addEventListener('blur', () => {
+                input.style.borderColor = '#e1e5e9';
+            });
+        });
+    }
+    
+    createSectionedHouseForm(houseData) {
+        // Create a form with all sections combined
+        let allFields = [];
+        
+        houseData.sections.forEach((section, sectionIndex) => {
+            if (section.type === 'readonly') {
+                // Add readonly section info
+                allFields.push({
+                    type: 'readonly-info',
+                    sectionName: section.name,
+                    description: section.description
+                });
+            } else if (section.conditionalGroups) {
+                // Add conditional section
+                allFields.push({
+                    type: 'conditional-section',
+                    sectionName: section.name,
+                    conditionalGroups: section.conditionalGroups
+                });
+            } else if (section.fields) {
+                // Add regular fields with section header
+                allFields.push({
+                    type: 'section-header',
+                    sectionName: section.name
+                });
+                section.fields.forEach(field => {
+                    allFields.push(field);
+                });
+            }
+        });
+        
+        return allFields.map((field, index) => {
+            if (field.type === 'readonly-info') {
+                return `
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 10px 0; border-left: 4px solid #8E8E93;">
+                        <h4 style="margin: 0 0 5px 0; color: #1d1d1f;">${field.sectionName}</h4>
+                        <p style="margin: 0; color: #666; font-size: 14px;">${field.description}</p>
+                    </div>
+                `;
+            } else if (field.type === 'conditional-section') {
+                return this.createConditionalSectionHTML(field, index);
+            } else if (field.type === 'section-header') {
+                return `
+                    <div style="background: #007AFF; color: white; padding: 10px 15px; border-radius: 8px; margin: 15px 0 10px 0; font-weight: 600;">
+                        ${field.sectionName}
+                    </div>
+                `;
+            } else {
+                return this.createFormField(field, index);
+            }
+        }).join('');
+    }
+    
+    createDirectHouseForm(houseData) {
+        return houseData.fields.map((field, index) => {
+            return this.createFormField(field, index);
+        }).join('');
+    }
+    
+    createConditionalSectionHTML(section, index) {
+        const conditionOptions = section.conditionalGroups.map(group => 
+            `<option value="${group.condition}">${group.condition.replace('_', ' ').toUpperCase()}</option>`
+        ).join('');
+        
+        return `
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 10px 0; border-left: 4px solid #FF9500;">
+                <h4 style="margin: 0 0 10px 0; color: #1d1d1f;">${section.sectionName}</h4>
+                <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #1d1d1f;">Entry Type:</label>
+                <select id="entry-type-${index}" name="entry-type-${index}" style="
+                    width: 100%;
+                    padding: 12px;
+                    border: 2px solid #e1e5e9;
+                    border-radius: 8px;
+                    font-size: 16px;
+                    margin-bottom: 10px;
+                    box-sizing: border-box;
+                    transition: border-color 0.3s ease;
+                ">
+                    <option value="">Select Entry Type</option>
+                    ${conditionOptions}
+                </select>
+                <div id="conditional-fields-${index}" style="display: none;">
+                    <!-- Dynamic fields will be added here -->
+                </div>
+            </div>
+        `;
+    }
+    
+    handleHouseDedicatedFormSubmission(house, houseData, formModal) {
+        const form = document.getElementById('house-dedicated-form');
+        const formData = new FormData(form);
+        const data = {};
+        
+        // Collect all form data
+        const inputs = form.querySelectorAll('input, select, textarea');
+        inputs.forEach(input => {
+            if (input.value && input.name) {
+                data[input.name] = input.value;
+            }
+        });
+        
+        console.log(`📝 House form submitted for ${houseData.name}:`, data);
+        
+        // Show success message
+        this.game.auth.showBottomNotification(`✅ ${houseData.name} submitted successfully!`, 'success');
+        
+        // Close modal
+        formModal.style.display = 'none';
+    }
+    
+    showHouseForm(house) {
+        const houseData = this.getHouseDataFromJSON(house.layerNumber);
+        if (!houseData || !houseData.fields) {
+            this.game.auth.showBottomNotification('❌ No form available for this house', 'error');
+            return;
+        }
+        
+        this.showFieldForm(house, houseData);
+    }
+    
+    showFieldForm(house, section) {
+        // Create form modal
+        let formModal = document.getElementById('section-form-modal');
+        if (!formModal) {
+            formModal = document.createElement('div');
+            formModal.id = 'section-form-modal';
+            formModal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                display: none;
+                justify-content: center;
+                align-items: center;
+                z-index: 3000;
+                backdrop-filter: blur(5px);
+                -webkit-backdrop-filter: blur(5px);
+            `;
+            document.body.appendChild(formModal);
+        }
+        
+        const formContent = document.createElement('div');
+        formContent.style.cssText = `
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 20px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        `;
+        
+        // Generate form fields based on section fields
+        const formFields = section.fields.map((field, index) => {
+            return this.createFormField(field, index);
+        }).join('');
+        
+        formContent.innerHTML = `
+            <h2 style="margin: 0 0 20px 0; color: #1d1d1f; font-size: 24px; text-align: center;">
+                ${section.name}
+            </h2>
+            <p style="margin: 0 0 30px 0; color: #666; font-size: 16px; text-align: center;">
+                Fill in the required information:
+            </p>
+            <form id="section-form" style="display: flex; flex-direction: column; gap: 20px;">
+                ${formFields}
+                <div style="display: flex; gap: 15px; justify-content: center; margin-top: 30px;">
+                    <button type="button" id="cancel-section-form" style="
+                        background: rgba(255, 59, 48, 0.1);
+                        color: #ff3b30;
+                        border: 2px solid rgba(255, 59, 48, 0.3);
+                        padding: 12px 24px;
+                        border-radius: 12px;
+                        font-size: 16px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                    ">Cancel</button>
+                    <button type="submit" style="
+                        background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
+                        color: white;
+                        border: none;
+                        padding: 12px 24px;
+                        border-radius: 12px;
+                        font-size: 16px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                    ">Submit</button>
+                </div>
+            </form>
+            <button id="close-section-form-modal" style="
+                position: absolute;
+                top: 15px;
+                right: 15px;
+                background: none;
+                border: none;
+                font-size: 24px;
+                cursor: pointer;
+                color: #666;
+            ">×</button>
+        `;
+        
+        formModal.innerHTML = '';
+        formModal.appendChild(formContent);
+        formModal.style.display = 'flex';
+        
+        // Add event listeners
+        document.getElementById('cancel-section-form').addEventListener('click', () => {
+            formModal.style.display = 'none';
+        });
+        
+        document.getElementById('close-section-form-modal').addEventListener('click', () => {
+            formModal.style.display = 'none';
+        });
+        
+        formModal.addEventListener('click', (e) => {
+            if (e.target === formModal) {
+                formModal.style.display = 'none';
+            }
+        });
+        
+        document.getElementById('section-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.handleSectionFormSubmission(house, section, formModal);
+        });
+        
+        // Add input focus effects
+        formContent.querySelectorAll('input, select, textarea').forEach(input => {
+            input.addEventListener('focus', () => {
+                input.style.borderColor = '#007AFF';
+            });
+            input.addEventListener('blur', () => {
+                input.style.borderColor = '#e1e5e9';
+            });
+        });
+    }
+    
+    createFormField(field, index) {
+        const fieldId = `field-${index}`;
+        const baseInputStyle = `
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            margin-top: 5px;
+            box-sizing: border-box;
+            transition: border-color 0.3s ease;
+        `;
+        
+        let inputElement = '';
+        
+        switch (field.type) {
+            case 'password':
+                inputElement = `<input type="password" id="${fieldId}" name="${fieldId}" placeholder="Enter ${field.label}" style="${baseInputStyle}">`;
+                break;
+            case 'time':
+                inputElement = `<input type="time" id="${fieldId}" name="${fieldId}" style="${baseInputStyle}">`;
+                break;
+            case 'date':
+                inputElement = `<input type="date" id="${fieldId}" name="${fieldId}" style="${baseInputStyle}">`;
+                break;
+            case 'number':
+                inputElement = `<input type="number" id="${fieldId}" name="${fieldId}" placeholder="Enter ${field.label}" style="${baseInputStyle}">`;
+                break;
+            case 'select':
+                const options = field.options ? field.options.map(option => `<option value="${option}">${option}</option>`).join('') : '';
+                inputElement = `<select id="${fieldId}" name="${fieldId}" style="${baseInputStyle}"><option value="">Select ${field.label}</option>${options}</select>`;
+                break;
+            case 'textarea':
+                inputElement = `<textarea id="${fieldId}" name="${fieldId}" placeholder="Enter ${field.label}" rows="4" style="${baseInputStyle}"></textarea>`;
+                break;
+            case 'table':
+                // Handle table type (for Mission Planning)
+                inputElement = this.createTableField(field, fieldId);
+                break;
+            default:
+                inputElement = `<input type="text" id="${fieldId}" name="${fieldId}" placeholder="Enter ${field.label}" style="${baseInputStyle}">`;
+        }
+        
+        return `
+            <div class="form-field">
+                <label for="${fieldId}" style="display: block; margin-bottom: 5px; font-weight: 600; color: #1d1d1f;">${field.label}:</label>
+                ${inputElement}
+            </div>
+        `;
+    }
+    
+    createTableField(field, fieldId) {
+        const columns = field.columns || [];
+        const tableRows = columns.map((column, index) => `
+            <tr>
+                <td style="padding: 8px; border: 1px solid #e1e5e9; background: #f8f9fa; font-weight: 600;">${column}</td>
+                <td style="padding: 8px; border: 1px solid #e1e5e9;">
+                    <input type="text" name="${fieldId}_${index}" placeholder="Enter ${column}" style="width: 100%; border: none; padding: 4px; background: transparent;">
+                </td>
+            </tr>
+        `).join('');
+        
+        return `
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; border: 1px solid #e1e5e9; border-radius: 8px; overflow: hidden;">
+                    <thead>
+                        <tr style="background: #f8f9fa;">
+                            <th style="padding: 12px; border: 1px solid #e1e5e9; text-align: left;">Mission</th>
+                            <th style="padding: 12px; border: 1px solid #e1e5e9; text-align: left;">Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tableRows}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+    
+    showReadonlySection(house, section) {
+        // Create readonly modal
+        let readonlyModal = document.getElementById('readonly-modal');
+        if (!readonlyModal) {
+            readonlyModal = document.createElement('div');
+            readonlyModal.id = 'readonly-modal';
+            readonlyModal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                display: none;
+                justify-content: center;
+                align-items: center;
+                z-index: 3000;
+                backdrop-filter: blur(5px);
+                -webkit-backdrop-filter: blur(5px);
+            `;
+            document.body.appendChild(readonlyModal);
+        }
+        
+        const readonlyContent = document.createElement('div');
+        readonlyContent.style.cssText = `
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 20px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        `;
+        
+        readonlyContent.innerHTML = `
+            <h2 style="margin: 0 0 20px 0; color: #1d1d1f; font-size: 24px; text-align: center;">
+                ${section.name}
+            </h2>
+            <div style="text-align: center; color: #666; font-size: 16px; margin-bottom: 30px;">
+                ${section.description || 'This is a read-only section.'}
+            </div>
+            <div style="text-align: center; color: #999; font-style: italic;">
+                📊 Data will be displayed here when available
+            </div>
+            <div style="display: flex; justify-content: center; margin-top: 30px;">
+                <button id="close-readonly-modal" style="
+                    background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
+                    color: white;
+                    border: none;
+                    padding: 12px 24px;
+                    border-radius: 12px;
+                    font-size: 16px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                ">Close</button>
+            </div>
+        `;
+        
+        readonlyModal.innerHTML = '';
+        readonlyModal.appendChild(readonlyContent);
+        readonlyModal.style.display = 'flex';
+        
+        // Add event listeners
+        document.getElementById('close-readonly-modal').addEventListener('click', () => {
+            readonlyModal.style.display = 'none';
+        });
+        
+        readonlyModal.addEventListener('click', (e) => {
+            if (e.target === readonlyModal) {
+                readonlyModal.style.display = 'none';
+            }
+        });
+    }
+    
+    showConditionalSection(house, section) {
+        // Create conditional modal
+        let conditionalModal = document.getElementById('conditional-modal');
+        if (!conditionalModal) {
+            conditionalModal = document.createElement('div');
+            conditionalModal.id = 'conditional-modal';
+            conditionalModal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                display: none;
+                justify-content: center;
+                align-items: center;
+                z-index: 3000;
+                backdrop-filter: blur(5px);
+                -webkit-backdrop-filter: blur(5px);
+            `;
+            document.body.appendChild(conditionalModal);
+        }
+        
+        const conditionalContent = document.createElement('div');
+        conditionalContent.style.cssText = `
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 20px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        `;
+        
+        // Create condition selector
+        const conditionOptions = section.conditionalGroups.map(group => 
+            `<option value="${group.condition}">${group.condition.replace('_', ' ').toUpperCase()}</option>`
+        ).join('');
+        
+        conditionalContent.innerHTML = `
+            <h2 style="margin: 0 0 20px 0; color: #1d1d1f; font-size: 24px; text-align: center;">
+                ${section.name}
+            </h2>
+            <p style="margin: 0 0 30px 0; color: #666; font-size: 16px; text-align: center;">
+                Select the entry type:
+            </p>
+            <form id="conditional-form" style="display: flex; flex-direction: column; gap: 20px;">
+                <div class="form-field">
+                    <label for="entry-type" style="display: block; margin-bottom: 5px; font-weight: 600; color: #1d1d1f;">Entry Type:</label>
+                    <select id="entry-type" name="entry-type" style="
+                        width: 100%;
+                        padding: 12px;
+                        border: 2px solid #e1e5e9;
+                        border-radius: 8px;
+                        font-size: 16px;
+                        margin-top: 5px;
+                        box-sizing: border-box;
+                        transition: border-color 0.3s ease;
+                    ">
+                        <option value="">Select Entry Type</option>
+                        ${conditionOptions}
+                    </select>
+                </div>
+                <div id="conditional-fields" style="display: none;">
+                    <!-- Dynamic fields will be added here -->
+                </div>
+                <div style="display: flex; gap: 15px; justify-content: center; margin-top: 30px;">
+                    <button type="button" id="cancel-conditional-form" style="
+                        background: rgba(255, 59, 48, 0.1);
+                        color: #ff3b30;
+                        border: 2px solid rgba(255, 59, 48, 0.3);
+                        padding: 12px 24px;
+                        border-radius: 12px;
+                        font-size: 16px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                    ">Cancel</button>
+                    <button type="submit" style="
+                        background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
+                        color: white;
+                        border: none;
+                        padding: 12px 24px;
+                        border-radius: 12px;
+                        font-size: 16px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                    ">Submit</button>
+                </div>
+            </form>
+            <button id="close-conditional-modal" style="
+                position: absolute;
+                top: 15px;
+                right: 15px;
+                background: none;
+                border: none;
+                font-size: 24px;
+                cursor: pointer;
+                color: #666;
+            ">×</button>
+        `;
+        
+        conditionalModal.innerHTML = '';
+        conditionalModal.appendChild(conditionalContent);
+        conditionalModal.style.display = 'flex';
+        
+        // Add event listeners
+        document.getElementById('cancel-conditional-form').addEventListener('click', () => {
+            conditionalModal.style.display = 'none';
+        });
+        
+        document.getElementById('close-conditional-modal').addEventListener('click', () => {
+            conditionalModal.style.display = 'none';
+        });
+        
+        conditionalModal.addEventListener('click', (e) => {
+            if (e.target === conditionalModal) {
+                conditionalModal.style.display = 'none';
+            }
+        });
+        
+        // Handle entry type selection
+        document.getElementById('entry-type').addEventListener('change', (e) => {
+            const selectedType = e.target.value;
+            const conditionalFields = document.getElementById('conditional-fields');
+            
+            if (selectedType) {
+                const selectedGroup = section.conditionalGroups.find(group => group.condition === selectedType);
+                if (selectedGroup && selectedGroup.fields) {
+                    const fieldsHTML = selectedGroup.fields.map((field, index) => {
+                        return this.createFormField(field, `conditional-${index}`);
+                    }).join('');
+                    
+                    conditionalFields.innerHTML = fieldsHTML;
+                    conditionalFields.style.display = 'block';
+                }
+            } else {
+                conditionalFields.style.display = 'none';
+            }
+        });
+        
+        document.getElementById('conditional-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.handleConditionalFormSubmission(house, section, conditionalModal);
+        });
+    }
+    
+    handleSectionFormSubmission(house, section, formModal) {
+        const form = document.getElementById('section-form');
+        const formData = new FormData(form);
+        const data = {};
+        
+        // Collect form data
+        section.fields.forEach((field, index) => {
+            const value = document.getElementById(`field-${index}`).value;
+            data[field.label] = value;
+        });
+        
+        console.log(`📝 Form submitted for ${section.name} in ${house.name}:`, data);
+        
+        // Show success message
+        this.game.auth.showBottomNotification(`✅ ${section.name} submitted successfully!`, 'success');
+        
+        // Close modal
+        formModal.style.display = 'none';
+    }
+    
+    handleConditionalFormSubmission(house, section, formModal) {
+        const form = document.getElementById('conditional-form');
+        const formData = new FormData(form);
+        const data = {};
+        
+        // Get selected entry type
+        const entryType = document.getElementById('entry-type').value;
+        data['Entry Type'] = entryType;
+        
+        // Collect conditional fields data
+        const conditionalFields = document.getElementById('conditional-fields');
+        const inputs = conditionalFields.querySelectorAll('input, select, textarea');
+        inputs.forEach(input => {
+            if (input.value) {
+                data[input.placeholder.replace('Enter ', '')] = input.value;
+            }
+        });
+        
+        console.log(`📝 Conditional form submitted for ${section.name} in ${house.name}:`, data);
+        
+        // Show success message
+        this.game.auth.showBottomNotification(`✅ ${section.name} submitted successfully!`, 'success');
+        
+        // Close modal
+        formModal.style.display = 'none';
     }
     
     handleHomeActions(action, house) {
