@@ -1,0 +1,425 @@
+{ "compressionlevel":-1,
+ "height":1,
+ "infinite":false,
+ "layers":[
+        {
+         "draworder":"topdown",
+         "id":8,
+         "locked":true,
+         "name":"house8",
+         "objects":[
+                {
+                 "height":0,
+                 "id":177,
+                 "name":"",
+                 "polygon":[
+                        {
+                         "x":0,
+                         "y":0
+                        },
+                    
+                        {
+                         "x":-116,
+                         "y":114
+                        },
+                    
+                        {
+                         "x":96,
+                         "y":218
+                        },
+                    
+                        {
+                         "x":210,
+                         "y":98
+                        }],
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":0,
+                 "x":816,
+                 "y":1090
+                }],
+         "opacity":1,
+         "type":"objectgroup",
+         "visible":true,
+         "x":0,
+         "y":0
+        },
+    
+        {
+         "draworder":"topdown",
+         "id":9,
+         "locked":true,
+         "name":"house7",
+         "objects":[
+                {
+                 "height":0,
+                 "id":257,
+                 "name":"",
+                 "polygon":[
+                        {
+                         "x":0,
+                         "y":0
+                        },
+                    
+                        {
+                         "x":-106,
+                         "y":72
+                        },
+                    
+                        {
+                         "x":90,
+                         "y":146
+                        },
+                    
+                        {
+                         "x":214,
+                         "y":44
+                        }],
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":0,
+                 "x":422,
+                 "y":1016
+                }],
+         "opacity":1,
+         "type":"objectgroup",
+         "visible":true,
+         "x":0,
+         "y":0
+        },
+    
+        {
+         "draworder":"topdown",
+         "id":11,
+         "locked":true,
+         "name":"house6",
+         "objects":[
+                {
+                 "height":0,
+                 "id":256,
+                 "name":"",
+                 "polygon":[
+                        {
+                         "x":0,
+                         "y":0
+                        },
+                    
+                        {
+                         "x":52,
+                         "y":44
+                        },
+                    
+                        {
+                         "x":-52,
+                         "y":98
+                        },
+                    
+                        {
+                         "x":-110,
+                         "y":36
+                        },
+                    
+                        {
+                         "x":-44,
+                         "y":-18
+                        }],
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":0,
+                 "x":152,
+                 "y":890
+                }],
+         "opacity":1,
+         "type":"objectgroup",
+         "visible":true,
+         "x":0,
+         "y":0
+        },
+    
+        {
+         "draworder":"topdown",
+         "id":10,
+         "locked":true,
+         "name":"house5",
+         "objects":[
+                {
+                 "height":0,
+                 "id":196,
+                 "name":"",
+                 "polygon":[
+                        {
+                         "x":0,
+                         "y":0
+                        },
+                    
+                        {
+                         "x":-56,
+                         "y":60
+                        },
+                    
+                        {
+                         "x":132,
+                         "y":134
+                        },
+                    
+                        {
+                         "x":248,
+                         "y":48
+                        },
+                    
+                        {
+                         "x":242,
+                         "y":10
+                        }],
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":0,
+                 "x":782,
+                 "y":804
+                }],
+         "opacity":1,
+         "type":"objectgroup",
+         "visible":true,
+         "x":0,
+         "y":0
+        },
+    
+        {
+         "draworder":"topdown",
+         "id":15,
+         "locked":true,
+         "name":"house4",
+         "objects":[
+                {
+                 "height":0,
+                 "id":251,
+                 "name":"",
+                 "polygon":[
+                        {
+                         "x":0,
+                         "y":0
+                        },
+                    
+                        {
+                         "x":228,
+                         "y":6
+                        },
+                    
+                        {
+                         "x":126,
+                         "y":94
+                        },
+                    
+                        {
+                         "x":2,
+                         "y":56
+                        }],
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":0,
+                 "x":794,
+                 "y":516
+                }],
+         "opacity":1,
+         "type":"objectgroup",
+         "visible":true,
+         "x":0,
+         "y":0
+        },
+    
+        {
+         "draworder":"topdown",
+         "id":14,
+         "name":"house3",
+         "objects":[
+                {
+                 "height":0,
+                 "id":240,
+                 "name":"",
+                 "polygon":[
+                        {
+                         "x":0,
+                         "y":0
+                        },
+                    
+                        {
+                         "x":218,
+                         "y":86
+                        },
+                    
+                        {
+                         "x":424,
+                         "y":-32
+                        },
+                    
+                        {
+                         "x":222,
+                         "y":-64
+                        }],
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":0,
+                 "x":310,
+                 "y":744
+                }],
+         "opacity":1,
+         "type":"objectgroup",
+         "visible":true,
+         "x":0,
+         "y":0
+        },
+    
+        {
+         "draworder":"topdown",
+         "id":13,
+         "name":"house2",
+         "objects":[
+                {
+                 "height":0,
+                 "id":232,
+                 "name":"",
+                 "polygon":[
+                        {
+                         "x":0,
+                         "y":0
+                        },
+                    
+                        {
+                         "x":68,
+                         "y":34
+                        },
+                    
+                        {
+                         "x":160,
+                         "y":12
+                        },
+                    
+                        {
+                         "x":174,
+                         "y":-46
+                        },
+                    
+                        {
+                         "x":152,
+                         "y":-88
+                        },
+                    
+                        {
+                         "x":14,
+                         "y":-48
+                        }],
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":0,
+                 "x":36,
+                 "y":426
+                }],
+         "opacity":1,
+         "type":"objectgroup",
+         "visible":true,
+         "x":0,
+         "y":0
+        },
+    
+        {
+         "draworder":"topdown",
+         "id":12,
+         "locked":true,
+         "name":"house1",
+         "objects":[
+                {
+                 "height":0,
+                 "id":223,
+                 "name":"",
+                 "polygon":[
+                        {
+                         "x":0,
+                         "y":0
+                        },
+                    
+                        {
+                         "x":84,
+                         "y":46
+                        },
+                    
+                        {
+                         "x":216,
+                         "y":50
+                        },
+                    
+                        {
+                         "x":308,
+                         "y":38
+                        },
+                    
+                        {
+                         "x":338,
+                         "y":6
+                        },
+                    
+                        {
+                         "x":304,
+                         "y":-38
+                        },
+                    
+                        {
+                         "x":124,
+                         "y":-32
+                        },
+                    
+                        {
+                         "x":10,
+                         "y":-34
+                        }],
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":0,
+                 "x":344,
+                 "y":256
+                }],
+         "opacity":1,
+         "type":"objectgroup",
+         "visible":true,
+         "x":0,
+         "y":0
+        }],
+ "nextlayerid":16,
+ "nextobjectid":258,
+ "orientation":"orthogonal",
+ "renderorder":"right-down",
+ "tiledversion":"1.11.2",
+ "tileheight":1613,
+ "tilesets":[
+        {
+         "columns":0,
+         "firstgid":1,
+         "margin":0,
+         "name":"realisticmap",
+         "spacing":0,
+         "tilecount":0,
+         "tileheight":32,
+         "tilewidth":32
+        },
+    
+        {
+         "firstgid":1,
+         "source":"..\/..\/SG v11\/Rivalation\/realisticmap.tsx"
+        },
+    
+        {
+         "firstgid":1,
+         "source":"realisticmap.tsx"
+        }],
+ "tilewidth":1037,
+ "type":"map",
+ "version":"1.10",
+ "width":1
+}

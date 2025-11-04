@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>House System Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #1d1d1f;
+            margin-bottom: 30px;
+        }
+        
+        .houses-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+        
+        .house-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .house-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+            border-color: #007AFF;
+        }
+        
+        .house-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1d1d1f;
+            margin-bottom: 10px;
+        }
+        
+        .house-description {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+        
+        .house-sections {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        
+        .section-tag {
+            background: #007AFF;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .readonly-tag {
+            background: #8E8E93;
+        }
+        
+        .conditional-tag {
+            background: #FF9500;
+        }
+        
+        .test-info {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #007AFF;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🏠 House System Test</h1>
+        
+        <div class="test-info">
+            <h3>📋 Test Instructions</h3>
+            <p>Click on any house card below to test the new house-specific button system. Each house now shows:</p>
+            <ul>
+                <li><strong>House-specific buttons</strong> based on the house structure</li>
+                <li><strong>Section buttons</strong> for houses with multiple sections (e.g., Seminar Management shows "Seminar Info", "Phone Info", "Entry Type", "Hygiene")</li>
+                <li><strong>Form buttons</strong> for simple houses (e.g., Login shows "Fill Form")</li>
+                <li><strong>Icon indicators</strong> to show button types (📝 for forms, 📊 for data, ⚙️ for settings)</li>
+                <li><strong>Proper names</strong> from the JSON data structure</li>
+                <li><strong>Dynamic forms</strong> with correct field types (text, password, time, number, select, textarea)</li>
+                <li><strong>Conditional fields</strong> for Entry Type selection</li>
+                <li><strong>Read-only sections</strong> for Analytics & History</li>
+                <li><strong>Table fields</strong> for Mission Planning</li>
+            </ul>
+        </div>
+        
+        <div class="houses-grid" id="housesGrid">
+            <!-- Houses will be dynamically generated here -->
+        </div>
+    </div>
+
+    <script>
+        // House data from the JSON structure
+        const houseData = {
+            1: { id: 1, name: "Login", fields: [{ label: "Password", type: "password" }] },
+            2: { 
+                id: 2, 
+                name: "Seminar Management", 
+                sections: [
+                    { name: "Seminar Info", fields: [
+                        { label: "Titles", type: "text" },
+                        { label: "Start Time", type: "time" },
+                        { label: "End Time", type: "time" },
+                        { label: "Number of Participants", type: "number" },
+                        { label: "Number of Certificates", type: "number" }
+                    ]},
+                    { name: "Phone Info", fields: [
+                        { label: "Training", type: "text" },
+                        { label: "Group", type: "text" },
+                        { label: "Session", type: "select", options: ["1st", "2nd", "3rd", "..."] }
+                    ]},
+                    { name: "Entry Type", conditionalGroups: [
+                        { condition: "voucher", fields: [
+                            { label: "Remaining Vouchers", type: "number" },
+                            { label: "Vouchers Entered", type: "number" }
+                        ]},
+                        { condition: "registration_form", fields: [
+                            { label: "Remaining Forms", type: "number" },
+                            { label: "Forms Entered", type: "number" }
+                        ]},
+                        { condition: "diploma", fields: [
+                            { label: "Remaining Diplomas", type: "number" },
+                            { label: "Diplomas Entered", type: "number" }
+                        ]}
+                    ]},
+                    { name: "Hygiene", fields: [
+                        { label: "District", type: "text" },
+                        { label: "Province", type: "text" },
+                        { label: "Completed by", type: "text" },
+                        { label: "Percentage", type: "number" }
+                    ]}
+                ]
+            },
+            3: { 
+                id: 3, 
+                name: "Analytics & History", 
+                sections: [
+                    { name: "Improvement Ideas", fields: [
+                        { label: "Titles", type: "text" },
+                        { label: "Details", type: "textarea" }
+                    ]},
+                    { name: "Other Players' Missions", type: "readonly", description: "Displays other players' missions based on player name" },
+                    { name: "Leaderboard", type: "readonly", description: "Displays the current ranking" },
+                    { name: "Coin History", type: "readonly", description: "Displays coin history by calendar date" }
+                ]
+            },
+            4: { 
+                id: 4, 
+                name: "Time Tracking", 
+                fields: [
+                    { label: "Arrival Time", type: "time" },
+                    { label: "Departure Time", type: "time" },
+                    { label: "Comments", type: "textarea" }
+                ]
+            },
+            5: { 
+                id: 5, 
+                name: "Administrative Data", 
+                sections: [
+                    { name: "Diploma", fields: [
+                        { label: "First Name", type: "text" },
+                        { label: "Last Name", type: "text" },
+                        { label: "Phone Number", type: "text" },
+                        { label: "Training", type: "text" }
+                    ]},
+                    { name: "Registration Form", fields: [
+                        { label: "First Name", type: "text" },
+                        { label: "Last Name", type: "text" },
+                        { label: "Phone Number", type: "text" },
+                        { label: "Training", type: "text" }
+                    ]},
+                    { name: "Pre-Registration", fields: [
+                        { label: "First Name", type: "text" },
+                        { label: "Last Name", type: "text" },
+                        { label: "Phone Number", type: "text" },
+                        { label: "Training", type: "text" },
+                        { label: "Province", type: "text" },
+                        { label: "District", type: "text" },
+                        { label: "Facebook", type: "text" }
+                    ]},
+                    { name: "Cash Register", fields: [
+                        { label: "Cash Fund", type: "number" },
+                        { label: "Vouchers", type: "number" },
+                        { label: "Expenses", type: "number" }
+                    ]}
+                ]
+            },
+            6: { 
+                id: 6, 
+                name: "Media & Statistics", 
+                sections: [
+                    { name: "Photo / Video", fields: [
+                        { label: "Training", type: "text" },
+                        { label: "Group", type: "text" },
+                        { label: "Date", type: "date" }
+                    ]},
+                    { name: "Defense (Final Project)", fields: [
+                        { label: "Training", type: "text" },
+                        { label: "Group", type: "text" }
+                    ]},
+                    { name: "Payment Report", fields: [
+                        { label: "Training", type: "text" },
+                        { label: "Group", type: "text" },
+                        { label: "Payment %", type: "number" }
+                    ]},
+                    { name: "Attendance Report", fields: [
+                        { label: "Training", type: "text" },
+                        { label: "Group", type: "text" },
+                        { label: "Attendance %", type: "number" }
+                    ]},
+                    { name: "Student Count", fields: [
+                        { label: "Training", type: "text" },
+                        { label: "Group", type: "text" },
+                        { label: "Number", type: "number" }
+                    ]}
+                ]
+            },
+            7: { 
+                id: 7, 
+                name: "Feedback & Tasks", 
+                sections: [
+                    { name: "Tasks", type: "readonly", description: "Read-only view" },
+                    { name: "Feedback", type: "readonly", description: "Read-only view" },
+                    { name: "Customer Satisfaction", type: "readonly", description: "Read-only view" }
+                ]
+            },
+            8: { 
+                id: 8, 
+                name: "Mission Planning", 
+                fields: [
+                    { label: "Missions", type: "table", columns: ["Mission 1", "Mission 2", "Mission 3", "..."] }
+                ]
+            }
+        };
+
+        // Generate house cards
+        function generateHouseCards() {
+            const grid = document.getElementById('housesGrid');
+            
+            Object.values(houseData).forEach(house => {
+                const card = document.createElement('div');
+                card.className = 'house-card';
+                card.onclick = () => showHouseModal(house);
+                
+                let sectionsHTML = '';
+                if (house.sections) {
+                    sectionsHTML = house.sections.map(section => {
+                        let tagClass = 'section-tag';
+                        if (section.type === 'readonly') tagClass += ' readonly-tag';
+                        if (section.conditionalGroups) tagClass += ' conditional-tag';
+                        return `<span class="${tagClass}">${section.name}</span>`;
+                    }).join('');
+                } else if (house.fields) {
+                    sectionsHTML = `<span class="section-tag">Form Fields (${house.fields.length})</span>`;
+                }
+                
+                card.innerHTML = `
+                    <div class="house-title">${house.name}</div>
+                    <div class="house-description">
+                        ${house.sections ? `Contains ${house.sections.length} sections` : `Contains ${house.fields ? house.fields.length : 0} fields`}
+                    </div>
+                    <div class="house-sections">${sectionsHTML}</div>
+                `;
+                
+                grid.appendChild(card);
+            });
+        }
+        
+        // Show house modal (simplified version)
+        function showHouseModal(house) {
+            let message = `🏠 ${house.name}\n\nThis house has specific buttons based on its structure:\n\n`;
+            
+            if (house.sections) {
+                message += `📋 Available Sections:\n`;
+                house.sections.forEach((section, index) => {
+                    let icon = '';
+                    if (section.type === 'readonly') {
+                        icon = '📊 ';
+                    } else if (section.conditionalGroups) {
+                        icon = '⚙️ ';
+                    } else if (section.fields) {
+                        icon = '📝 ';
+                    }
+                    message += `${icon}${section.name}\n`;
+                });
+            } else if (house.fields) {
+                message += `📝 Direct Form Fields (${house.fields.length} fields)`;
+            }
+            
+            message += `\n\nClick "OK" to see the specific buttons for this house.`;
+            alert(message);
+            
+            if (house.sections) {
+                console.log('House sections:', house.sections);
+                house.sections.forEach((section, index) => {
+                    if (section.fields) {
+                        console.log(`Section ${index + 1}: ${section.name}`, section.fields);
+                    } else if (section.type === 'readonly') {
+                        console.log(`Readonly section: ${section.name} - ${section.description}`);
+                    } else if (section.conditionalGroups) {
+                        console.log(`Conditional section: ${section.name}`, section.conditionalGroups);
+                    }
+                });
+            } else if (house.fields) {
+                console.log('House fields:', house.fields);
+            }
+        }
+        
+        // Initialize the test
+        document.addEventListener('DOMContentLoaded', () => {
+            generateHouseCards();
+            console.log('🏠 House System Test loaded successfully!');
+            console.log('📊 House data structure:', houseData);
+        });
+    </script>
+</body>
+</html>
