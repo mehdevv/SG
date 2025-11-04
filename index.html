@@ -80,13 +80,11 @@
                         <span id="userLevel" class="level-number">1</span>
                     </div>
                     <div class="xp-bar-container">
+                        <div class="xp-text">
+                            <span id="playerName" class="xp-current">Player</span>
+                        </div>
                         <div class="xp-bar-background">
                             <div id="xpBarFill" class="xp-bar-fill" style="width: 0%"></div>
-                        </div>
-                        <div class="xp-text">
-                            <span id="userExp" class="xp-current">0</span>
-                            <span class="xp-separator">/</span>
-                            <span id="userExpMax" class="xp-max">100</span>
                         </div>
                     </div>
                 </div>
@@ -95,11 +93,11 @@
             <!-- Top Right: Coins -->
             <div class="hud-right">
                 <div class="coins-container">
-                    <div class="coins-icon">💰</div>
                     <div class="coins-amount">
                         <span id="userPoints" class="coins-value">0</span>
                         <span class="coins-label">DZD</span>
                     </div>
+                    <div class="coins-icon">💰</div>
                 </div>
                 <button id="hudRefreshButton" class="settings-btn" title="Refresh Stats">
                     <svg class="settings-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -132,6 +130,7 @@
         <!-- Quest Panel Toggle Arrow -->
         <div id="questToggle" class="quest-toggle">
             <div class="quest-arrow">▶</div>
+            <span id="questNotificationBadge" class="quest-notification-badge" style="display: none;"></span>
         </div>
         
         <!-- Quest Panel -->

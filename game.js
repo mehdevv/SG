@@ -1317,7 +1317,7 @@ class MapManager {
 class Player {
     constructor(game) {
         this.game = game;
-        this.x = 500; // Adjusted for realistic map (1037x1613)
+        this.x = 470; // Adjusted for realistic map (1037x1613)
         this.y = 800; // Adjusted for realistic map (1037x1613)
         this.width = 36; // 1.5x bigger (was 24)
         this.height = 46.8; // 1.5x bigger (was 31.2)
@@ -1489,8 +1489,7 @@ class UIManager {
             userName: document.getElementById('userName'),
             userLevel: document.getElementById('userLevel'),
             userPoints: document.getElementById('userPoints'),
-            userExp: document.getElementById('userExp'),
-            userExpMax: document.getElementById('userExpMax'),
+            playerName: document.getElementById('playerName'),
             playerAvatar: document.getElementById('playerAvatar'),
             questToggle: document.getElementById('questToggle'),
             questPanel: document.getElementById('questPanel'),
@@ -1507,8 +1506,8 @@ class UIManager {
     setupQuestPanel() {
         // Quest toggle click handler
         if (this.elements.questToggle) {
-            this.elements.questToggle.addEventListener('click', () => {
-                this.toggleQuestPanel();
+            this.elements.questToggle.addEventListener('click', async () => {
+                await this.toggleQuestPanel();
             });
         }
         
@@ -1522,17 +1521,27 @@ class UIManager {
         // The click handler is already set up in setupQuestPanel()
     }
     
-    toggleQuestPanel() {
+    async toggleQuestPanel() {
         if (this.elements.questPanel.classList.contains('open')) {
             this.closeQuestPanel();
         } else {
-            this.openQuestPanel();
+            await this.openQuestPanel();
         }
     }
     
-    openQuestPanel() {
+    async openQuestPanel() {
         this.elements.questPanel.classList.add('open');
         this.elements.questToggle.classList.add('open');
+        
+        // Mark all current quests as seen in database when panel is opened
+        await this.markQuestsAsSeen();
+        
+        // Hide notification badge when panel is opened
+        const notificationBadge = document.getElementById('questNotificationBadge');
+        if (notificationBadge) {
+            notificationBadge.style.display = 'none';
+        }
+        
         console.log('📋 Quest panel pulled out from left side');
     }
     
@@ -1540,6 +1549,16 @@ class UIManager {
         this.elements.questPanel.classList.remove('open');
         this.elements.questToggle.classList.remove('open');
         console.log('📋 Quest panel pushed back behind arrow');
+        
+        // Re-check notification status when panel closes
+        // This will be handled by updateQuestNotification when quests are loaded
+        // Trigger a quest reload check if needed
+        if (this.game?.auth?.loadPlayerQuests) {
+            // Small delay to ensure panel is closed before checking
+            setTimeout(() => {
+                this.game.auth.loadPlayerQuests();
+            }, 100);
+        }
     }
     
     setupSettingsButton() {
@@ -2092,7 +2111,6 @@ class UIManager {
         // Get current values from the actual game UI elements
         const currentLevel = this.elements?.userLevel?.textContent || '1';
         const currentCoins = this.elements?.userPoints?.textContent || '0';
-        const currentExp = this.elements?.userExp?.textContent || '0';
         
         // Try to get user from Firebase auth first (most reliable)
         if (window.firebase && window.firebase.auth) {
@@ -2134,7 +2152,7 @@ class UIManager {
         const actualStats = {
             level: parseInt(currentLevel) || 1,
             points: parseInt(currentCoins) || 0,
-            experience: parseInt(currentExp) || 0,
+            experience: stats?.experience || savedStats?.experience || 0,
             gamesPlayed: 0,
             totalPlayTime: 0,
             achievements: 0,
@@ -2625,8 +2643,33 @@ class UIManager {
             }
         }
         
-        // Update experience and XP bar (CoC-style HUD)
-        if (this.elements.userExp && this.elements.userExpMax) {
+        // Update player name and XP bar (CoC-style HUD)
+        if (this.elements.playerName) {
+            // Get player name from Firestore stats (name field)
+            let displayName = 'Player';
+            
+            // First try to get from stats (from Firestore)
+            if (stats && stats.name) {
+                displayName = stats.name;
+            } else if (this.auth && this.auth.userStats && this.auth.userStats.name) {
+                // Fallback to auth userStats
+                displayName = this.auth.userStats.name;
+            } else if (this.auth && this.auth.user) {
+                // Final fallback to email or displayName
+                displayName = this.auth.user.displayName || 
+                             this.auth.user.email?.split('@')[0] || 
+                             'Player';
+            }
+            
+            // Update player name text
+            if (this.elements.playerName.textContent !== displayName) {
+                this.elements.playerName.textContent = displayName;
+                this.highlightStatChange('playerName');
+            }
+        }
+        
+        // Update XP bar (experience calculation for bar fill)
+        {
             let currentExp, maxExp, expPercentage;
             
             if (stats.level >= 10) {
@@ -2637,17 +2680,6 @@ class UIManager {
                 maxExp = stats.level * 100; // Level 1: 100, Level 2: 200, etc.
                 currentExp = stats.experience;
                 expPercentage = Math.min((stats.experience / maxExp) * 100, 100);
-            }
-            
-            // Update current XP text
-            if (this.elements.userExp.textContent !== currentExp.toString()) {
-                this.elements.userExp.textContent = currentExp;
-                this.highlightStatChange('userExp');
-            }
-            
-            // Update max XP text
-            if (this.elements.userExpMax.textContent !== maxExp.toString()) {
-                this.elements.userExpMax.textContent = maxExp;
             }
             
             // Update XP bar fill
@@ -2744,6 +2776,14 @@ class UIManager {
         const questContent = document.querySelector('.quest-content');
         if (!questContent) return;
         
+        // Get seen quest IDs from database (userStats)
+        const seenQuestIds = this.game?.auth?.userStats?.seenQuests || [];
+        const currentQuestIds = quests.map(q => q.id);
+        
+        // Check if there are any unseen quests
+        const unseenQuestIds = currentQuestIds.filter(id => !seenQuestIds.includes(id));
+        const hasUnseenQuests = unseenQuestIds.length > 0;
+        
         // Use DocumentFragment for better performance
         const fragment = document.createDocumentFragment();
         
@@ -2764,8 +2804,60 @@ class UIManager {
         questContent.innerHTML = '';
         questContent.appendChild(fragment);
         
+        // Show notification badge if there are unseen quests and panel is closed
+        this.updateQuestNotification(hasUnseenQuests);
+        
         // Start quest timer updates
         this.startQuestTimerUpdates();
+    }
+    
+    async markQuestsAsSeen() {
+        if (!this.game?.auth?.user || !this.game?.auth?.userStats || !window.db) return;
+        
+        try {
+            // Get current quest IDs
+            const questContent = document.querySelector('.quest-content');
+            if (!questContent) return;
+            
+            const questElements = questContent.querySelectorAll('.quest-item');
+            const currentQuestIds = Array.from(questElements).map(el => el.getAttribute('data-quest-id')).filter(id => id);
+            
+            if (currentQuestIds.length === 0) return;
+            
+            // Get existing seen quest IDs
+            const existingSeenQuests = this.game.auth.userStats.seenQuests || [];
+            
+            // Merge with current quest IDs (remove duplicates)
+            const allSeenQuests = [...new Set([...existingSeenQuests, ...currentQuestIds])];
+            
+            // Update userStats
+            this.game.auth.userStats.seenQuests = allSeenQuests;
+            
+            // Save to database
+            await this.game.auth.saveUserStats();
+            
+            console.log('✅ Marked quests as seen:', currentQuestIds);
+        } catch (error) {
+            console.error('❌ Error marking quests as seen:', error);
+        }
+    }
+    
+    updateQuestNotification(hasUnseenQuests) {
+        const notificationBadge = document.getElementById('questNotificationBadge');
+        const questPanel = this.elements.questPanel;
+        const questToggle = this.elements.questToggle;
+        
+        if (!notificationBadge || !questPanel || !questToggle) return;
+        
+        // Only show notification if there are unseen quests and panel is closed
+        const isPanelOpen = questPanel.classList.contains('open');
+        
+        if (hasUnseenQuests && !isPanelOpen) {
+            notificationBadge.style.display = 'block';
+        } else {
+            // Hide notification if panel is open or no unseen quests
+            notificationBadge.style.display = 'none';
+        }
     }
     
     createQuestElement(quest) {
@@ -2872,7 +2964,7 @@ class UIManager {
         if (detailsDiv.style.display === 'none') {
             // Expand details
             detailsDiv.style.display = 'block';
-            detailsBtn.textContent = '✕';
+            detailsBtn.textContent = '×';
             detailsBtn.classList.add('expanded');
         } else {
             // Collapse details
@@ -4071,6 +4163,7 @@ class AuthManager {
                     level: 1,
                     points: 0,
                     experience: 0,
+                    seenQuests: [], // Track quest IDs that have been seen
                     createdAt: new Date().toISOString(),
                     lastLogin: new Date().toISOString()
                 };
@@ -4083,6 +4176,13 @@ class AuthManager {
                 this.userStats.uid = this.user.uid;
                 await this.saveUserStats();
                 console.log("✅ Updated user stats with UID");
+            }
+            
+            // Ensure seenQuests array exists
+            if (this.userStats && !this.userStats.seenQuests) {
+                this.userStats.seenQuests = [];
+                await this.saveUserStats();
+                console.log("✅ Initialized seenQuests array");
             }
             
             this.game.ui.updateUserStats(this.userStats);
